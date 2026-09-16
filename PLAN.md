@@ -153,7 +153,7 @@ M0 で `put_model` がこの身体定義を受理することを確かめる。
 
 床は `<geom type="plane">` 一枚とし、床以外の支持物は置かない。
 体節の接触形状は §3.1 の形状列に従う。
-足は箱一つで表し、四隅に接触検出用の `<site>` を置く。
+足は箱一つで表し、足底全体を覆う箱型の `<site>` を接触検出用に置く。
 
 摩擦係数は床と全体節で 1.0、`condim="3"` とする。
 隣接する親子体節の対は `<contact><exclude>` で接触計算から外し、それ以外の自己接触は有効にする。
@@ -184,7 +184,69 @@ M0 で `put_model` がこの身体定義を受理することを確かめる。
 ソルバは MuJoCo Warp の既定（Newton）を使い、反復回数は M0 の安定性試験で決める。
 安定性試験で刻みを変えた場合は全条件へ同じ設定を適用し、本比較の前に固定する。
 
-### 3.7 身体の検証項目
+### 3.7 骨格 XML
+
+§3.1 から §3.6 を MuJoCo XML に落とすと次の形になる。
+左脚の連鎖だけを示し、右脚と体幹以下は同じ形式で書く。
+数値はすべて表の初期値で、M1 の検証で改訂したら XML と表を同時に直す。
+
+```xml
+<mujoco model="multibrain_humanoid">
+  <option timestep="0.005"/>
+  <default>
+    <joint type="hinge" armature="0.02" damping="2" frictionloss="0.2" limited="true"/>
+    <geom condim="3" friction="1.0 0.005 0.0001"/>
+    <general dyntype="filter" dynprm="0.04" ctrlrange="-1 1" ctrllimited="true"/>
+  </default>
+  <worldbody>
+    <geom name="floor" type="plane" size="0 0 1"/>
+    <body name="pelvis" pos="0 0 0.93">
+      <freejoint/>
+      <geom type="box" size="0.14 0.09 0.09" mass="6.2"/>
+      <site name="imu"/>
+      <body name="thigh_L" pos="0 0.09 -0.05">
+        <joint name="hip_L_x" axis="1 0 0" range="-30 120"/>
+        <joint name="hip_L_y" axis="0 1 0" range="-40 40"/>
+        <joint name="hip_L_z" axis="0 0 1" range="-40 40"/>
+        <geom type="capsule" fromto="0 0 0 0 0 -0.38" size="0.06" mass="7.4"/>
+        <body name="shin_L" pos="0 0 -0.38">
+          <joint name="knee_L" axis="1 0 0" range="0 150"/>
+          <geom type="capsule" fromto="0 0 0 0 0 -0.37" size="0.045" mass="2.4"/>
+          <body name="foot_L" pos="0 0 -0.37">
+            <joint name="ankle_L_x" axis="1 0 0" range="-45 30"/>
+            <joint name="ankle_L_y" axis="0 1 0" range="-25 25"/>
+            <geom type="box" pos="0.04 0 -0.02" size="0.11 0.045 0.02" mass="0.65"/>
+            <site name="foot_L_contact" type="box" pos="0.04 0 -0.02" size="0.11 0.045 0.02"/>
+          </body>
+        </body>
+      </body>
+      <!-- thigh_R、torso（waist_*、head、upper_arm_*）は同じ形式 -->
+    </body>
+  </worldbody>
+  <contact>
+    <exclude body1="pelvis" body2="thigh_L"/>
+    <!-- 隣接する親子体節の対をすべて列挙 -->
+  </contact>
+  <actuator>
+    <general name="hip_L_x" joint="hip_L_x" gear="120"/>
+    <!-- 27 関節すべてに gear を §3.2 の上限トルクとして付ける -->
+  </actuator>
+  <sensor>
+    <jointpos joint="hip_L_x"/>
+    <jointvel joint="hip_L_x"/>
+    <framequat objtype="site" objname="imu"/>
+    <gyro site="imu"/>
+    <velocimeter site="imu"/>
+    <framepos objtype="site" objname="imu"/>
+    <touch site="foot_L_contact"/>
+    <!-- 27 関節と 12 接触部位に同様に付ける -->
+  </sensor>
+</mujoco>
+```
+
+関節名、群、上限トルクは `configs/joint_groups.yaml` からこの XML を生成するスクリプトで揃え、表と XML の食い違いを試験で検出する。
+
+### 3.8 身体の検証項目
 
 M1 では次を通す。
 
@@ -265,6 +327,18 @@ LIF 版の出力関数を σ に差し替え、リセットと不応期を外す
 
 観測の各信号を、MaleCNS の感覚ニューロンの注釈（受容器の種別、入口となる神経、体節、左右）で選んだニューロン群に流し込む。
 選択規則は `ports.json` を生成するスクリプトに書き、規則と実際に選ばれたニューロン数を記録する。
+
+MaleCNS の注釈クラスと、この計画での役割の対応は次のとおりである。
+
+| 注釈クラス | 役割 | 節 |
+|---|---|---|
+| 感覚ニューロン（脚、触角、平均棍、体幹の受容器） | 身体感覚の入力ポート | §4.3 |
+| 視覚投射ニューロン（LC 群、LPTC 群） | 深度入力の注入先。初版では入力なしで神経中核の一部 | §9 |
+| 視覚葉内在ニューロン | ニューロン集合から除外 | §4.1 |
+| 下行性ニューロン | 脳から神経索への内部経路。`tri_linked` では他脳への送り手 | §6.1 |
+| 上行性ニューロン | 神経索から脳への内部経路。`tri_linked_an` では他脳への送り手 | §6.3 |
+| 運動ニューロン（標的筋の注釈つき） | トルクの出力ポート | §4.4 |
+| 上記以外の中間ニューロン | 神経中核の内部。ポートにしない | §4.2 |
 
 身体側の四肢とハエの脚は次のように対応づける。
 ハエの脚の関節は胸部と基節の間（3 自由度相当）、基節と転節の間（1）、腿節と脛節の間（1）、脛節と跗節の間（1）で [S19]、人の四肢の自由度構成に近い。
@@ -637,7 +711,7 @@ CPU は取得、前処理、管理、保存を、GPU は神経計算、学習、
 | 段階 | 作業 | 次へ進む条件 |
 |---|---|---|
 | M0 データと計測 | データ固定、`ports.json` 生成、身体定義の受理確認、接触バッファの上限測定、全規模の順伝播と逆伝播、身体ステップ/s の実測 | `dataset_manifest.json`、`ports.json`、`benchmark.json` があり、全規模で一回の学習更新が通る |
-| M1 身体と MLP | `humanoid.xml`、観測、成功判定、報酬、`mlp_control` | §3.7 の検証を通し、G1 を達成する |
+| M1 身体と MLP | `humanoid.xml`、観測、成功判定、報酬、`mlp_control` | §3.8 の検証を通し、G1 を達成する |
 | M2 一脳 | 更新式、ポート、読出し、切り詰め窓の学習、保存と再開、ハイパーパラメータ探索 | 小規模試験で勾配を検証し、全規模で中核のパラメータへ更新が届き、G2 を達成する |
 | M3 三脳と結合と監視 | 三脳条件、操作分配、合成シナプス、監視記録、語り手 | 全条件が継続して進み、学習状態、経験、結合の混線がなく、切断と入替の介入が動く |
 | M4 本比較 | 5 条件 × 3 乱数 × 5×10^8 身体ステップ、対照条件、介入試験、VRM 再生 | G3 を達成し、成功と未達成を含む結果を再生できる |
