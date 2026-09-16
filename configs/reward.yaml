@@ -1,0 +1,39 @@
+# PLAN.md §5.3 の報酬係数と閾値。すべて初期値で、M1 の mlp_control による検証で固定する。
+# 記号: h_ref 基準立位の骨盤高 [m]、a 方策の指令、ã 一次遅れ後の正規化トルク (MuJoCo act)、
+#       q̃ 可動域で [-1, 1] に正規化した関節角度。
+h_ref: 0.84
+
+coef:
+  height_progress: 2.0        # (h_t - h_{t-1}) / h_ref
+  uprightness: 0.2            # cos θ_t · 1[h_t ≥ uprightness.min_height_ratio · h_ref]
+  standing: 1.0               # 成功条件（§5.2）を満たすステップごとに 1
+  first_success: 10.0         # 連続 10 秒を初めて満たしたとき一回
+  pain_impact: 0.5            # -Σ_k w_k · onset_k · min([v_k - v0]+², v_cap²)
+  pain_joint_limit: 0.05      # -(1/J) Σ_j ξ_j² · [sign(q̃_j) · ã_j]+
+  fatigue_energy: 0.02        # -(1/J) Σ_j ã_j²
+  fatigue_action_rate: 0.05   # -(1/J) Σ_j (a_{j,t} - a_{j,t-1})²
+  extra_contact: 0.05         # -(足以外の接触数) · 1[h_t ≥ extra_contact.min_height_ratio · h_ref]
+
+uprightness:
+  min_height_ratio: 0.5
+
+extra_contact:
+  min_height_ratio: 0.8
+
+contact:
+  force_min_n: 1.0            # 接触センサの力がこれ以上で「接している」
+
+impact:
+  sites: [touch_head, touch_chest, touch_back, touch_pelvis]
+  weight:
+    touch_head: 1.5
+    face: 2.0                 # touch_head の前方軸 (framexaxis) の世界 z 成分が face_axis_z_max 未満のとき
+    touch_chest: 1.0
+    touch_back: 1.0
+    touch_pelvis: 0.5
+  face_axis_z_max: -0.5
+  v0: 0.5                     # m/s
+  v_cap: 3.0                  # m/s
+
+joint_limit:
+  band: 0.1                   # 半可動域に対する端の帯の幅 δ̃

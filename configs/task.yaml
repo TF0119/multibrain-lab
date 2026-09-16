@@ -1,0 +1,30 @@
+# PLAN.md §3.6、§5.1、§5.2 の課題設定。
+body_step_s: 0.02
+physics_substeps: 4           # 5 ms × 4 = 20 ms
+
+tasks:
+  rise_and_stand:
+    episode_s: 60
+    starts: [supine, prone, side]
+    terminate_on_fall: false
+  stand_balance:
+    episode_s: 60
+    starts: [standing]
+    terminate_on_fall: false
+
+termination:
+  max_pelvis_xy_m: 3.0        # 場外
+  on_nonfinite: true          # 数値異常
+
+success:
+  hold_s: 10                  # 連続して満たす秒数
+  tilt_deg_max: 15            # 胴体 z 軸と鉛直のなす角
+  height_ratio_min: 0.9       # 骨盤高 / h_ref
+  horizontal_speed_max: 0.2   # m/s
+  milestones_s: [1, 3, 10]    # 観察用の節目
+
+evaluation:
+  n_starts: 24                # 仰向け、うつ伏せ、横向き × 8
+  every_body_steps: 5000000
+  mastery_min_success: 20
+  mastery_consecutive: 2
