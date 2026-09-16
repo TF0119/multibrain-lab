@@ -1,3 +1,15 @@
+from .activity import (
+    GROUPS,
+    SAMPLE_GROUPS,
+    SAMPLE_PER_GROUP,
+    SAMPLE_SEED,
+    BrainActivitySource,
+    activity_meta,
+    build_groups,
+    build_sample,
+    decode_activity,
+    encode_activity,
+)
 from .pose_stream import (
     MAGIC,
     PoseStreamer,
@@ -16,4 +28,14 @@ __all__ = [
     "decode_frame",
     "encode_frame",
     "fk",
+    "GROUPS",
+    "SAMPLE_GROUPS",
+    "SAMPLE_PER_GROUP",
+    "SAMPLE_SEED",
+    "BrainActivitySource",
+    "activity_meta",
+    "build_groups",
+    "build_sample",
+    "decode_activity",
+    "encode_activity",
 ]

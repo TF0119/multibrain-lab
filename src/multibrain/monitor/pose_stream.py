@@ -41,6 +41,8 @@ import warnings
 
 import numpy as np
 
+from .activity import encode_activity
+
 MAGIC = b"MBP1"
 
 # MuJoCo body -> VRM humanoid bone (VRMHumanBoneName in three-vrm).
@@ -282,23 +284,31 @@ class PoseStreamer:
     with call_soon_threadsafe. With no clients it returns immediately.
     """
 
-    def __init__(self, meta, host="127.0.0.1", port=8765, hz=30.0):
+    def __init__(self, meta, host="127.0.0.1", port=8765, hz=30.0,
+                 activity_hz=10.0):
         self.meta = dict(meta)
         self.meta["hz"] = float(hz)
         self.host = host
         self.port = int(port)
         self.hz = float(hz)
         self._min_interval = 1.0 / self.hz if self.hz > 0 else 0.0
+        self.activity_hz = float(activity_hz)
+        self._activity_interval = (
+            1.0 / self.activity_hz if self.activity_hz > 0 else 0.0)
+        self._has_activity = "activity" in self.meta
+        self._last_activity = 0.0
         self.enabled = False
         self._loop = None
         self._server = None
         self._thread = None
         self._ready = threading.Event()
-        self._clients = {}  # ws -> asyncio.Queue(maxsize=1)
+        # ws -> ({"pose": frame|None, "activity": frame|None}, asyncio.Event)
+        self._clients = {}
         self._n_clients = 0
         self._seq = 0
         self._last_sent = 0.0
-        self.stats = {"submitted": 0, "sent": 0, "dropped_rate": 0}
+        self.stats = {"submitted": 0, "sent": 0, "dropped_rate": 0,
+                      "activity_submitted": 0, "activity_sent": 0}
 
     def start(self):
         try:
@@ -337,15 +347,24 @@ class PoseStreamer:
         self.port = int(sock.getsockname()[1])
 
     async def _handler(self, ws):
-        q = asyncio.Queue(maxsize=1)
-        self._clients[ws] = q
+        # per client, per frame kind, keep only the newest frame
+        state = {"pose": None, "activity": None}
+        ready = asyncio.Event()
+        self._clients[ws] = (state, ready)
         self._n_clients = len(self._clients)
         try:
             await ws.send(json.dumps(self.meta))
             while True:
-                frame = await q.get()
-                await ws.send(frame)
-                self.stats["sent"] += 1
+                await ready.wait()
+                ready.clear()
+                for kind in ("pose", "activity"):
+                    frame = state[kind]
+                    if frame is None:
+                        continue
+                    state[kind] = None
+                    await ws.send(frame)
+                    self.stats["sent" if kind == "pose"
+                               else "activity_sent"] += 1
         except Exception:
             pass
         finally:
@@ -365,23 +384,44 @@ class PoseStreamer:
         frame = encode_frame(self._seq, t, qpos)
         self.stats["submitted"] += 1
         try:
-            self._loop.call_soon_threadsafe(self._publish, frame)
+            self._loop.call_soon_threadsafe(self._publish, "pose", frame)
         except RuntimeError:
             self.enabled = False
             return False
         return True
 
-    def _publish(self, frame):
-        for q in self._clients.values():
-            if q.full():
-                try:
-                    q.get_nowait()
-                except asyncio.QueueEmpty:
-                    pass
-            try:
-                q.put_nowait(frame)
-            except asyncio.QueueFull:
-                pass
+    def wants_activity(self):
+        """True when an MBA1 activity frame is due (activity_hz limit).
+
+        Read-only peek: it does not consume the slot — submit_activity()
+        checks the same condition again and marks the time.
+        """
+        if not self.enabled or self._n_clients == 0 or not self._has_activity:
+            return False
+        return time.monotonic() - self._last_activity >= self._activity_interval
+
+    def submit_activity(self, t, stats, sample):
+        """Offer an MBA1 activity frame. Same contract as submit()."""
+        if not self.enabled or self._n_clients == 0 or not self._has_activity:
+            return False
+        now = time.monotonic()
+        if now - self._last_activity < self._activity_interval:
+            return False
+        self._last_activity = now
+        self._seq += 1
+        frame = encode_activity(self._seq, t, stats, sample)
+        self.stats["activity_submitted"] += 1
+        try:
+            self._loop.call_soon_threadsafe(self._publish, "activity", frame)
+        except RuntimeError:
+            self.enabled = False
+            return False
+        return True
+
+    def _publish(self, kind, frame):
+        for state, ready in self._clients.values():
+            state[kind] = frame  # overwrite: only the newest survives
+            ready.set()
 
     def close(self):
         self.enabled = False
