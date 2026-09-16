@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "multibrain"
+version = "0.0.1"
+description = "MaleCNS 由来の神経モデルを人型身体に接続する実験"
+requires-python = ">=3.12"
+dependencies = [
+  "numpy",
+  "pyarrow",
+  "pandas",
+  "scipy",
+  "pyyaml",
+  "torch",
+  "mujoco",
+  "warp-lang",
+  "mujoco-warp",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
