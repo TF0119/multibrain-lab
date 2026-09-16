@@ -1,0 +1,38 @@
+# 27 actuated hinge joints, from PLAN.md §3.2.
+# The table's one-sided entries ("*") are expanded to _L and _R.
+# axis: rotation axis vector in the body frame (x = fore-aft/forward is +x,
+# y = lateral/left is +y, z = up). Chosen so that the positive side of the
+# range is the anatomically positive direction; right-side abduction and
+# internal/external rotation axes are mirrored.
+# range_deg: [lo, hi] joint limit in degrees (converted to radians in XML).
+# torque: actuator gear in N·m (ctrl is normalized to [-1, 1]).
+# group: brain-side grouping — left (11), center (5), right (11).
+# parent_body: the <body> element that declares this joint (child side of the link).
+joints:
+  - {name: waist_z,       axis: [0, 0, 1],  range_deg: [-40, 40],  torque: 60,  group: center, parent_body: torso}
+  - {name: waist_y,       axis: [1, 0, 0],  range_deg: [-30, 30],  torque: 80,  group: center, parent_body: torso}
+  - {name: waist_x,       axis: [0, -1, 0], range_deg: [-60, 30],  torque: 100, group: center, parent_body: torso}
+  - {name: neck_y,        axis: [1, 0, 0],  range_deg: [-45, 45],  torque: 15,  group: center, parent_body: head}
+  - {name: neck_z,        axis: [0, 0, 1],  range_deg: [-60, 60],  torque: 15,  group: center, parent_body: head}
+  - {name: shoulder_L_x,  axis: [0, -1, 0], range_deg: [-60, 170], torque: 40,  group: left,   parent_body: upper_arm_L}
+  - {name: shoulder_L_y,  axis: [1, 0, 0],  range_deg: [-30, 150], torque: 40,  group: left,   parent_body: upper_arm_L}
+  - {name: shoulder_L_z,  axis: [0, 0, 1],  range_deg: [-80, 80],  torque: 25,  group: left,   parent_body: upper_arm_L}
+  - {name: elbow_L,       axis: [0, -1, 0], range_deg: [0, 150],   torque: 30,  group: left,   parent_body: forearm_L}
+  - {name: wrist_L,       axis: [0, -1, 0], range_deg: [-70, 70],  torque: 8,   group: left,   parent_body: hand_L}
+  - {name: hip_L_x,       axis: [0, -1, 0], range_deg: [-30, 120], torque: 120, group: left,   parent_body: thigh_L}
+  - {name: hip_L_y,       axis: [1, 0, 0],  range_deg: [-40, 40],  torque: 80,  group: left,   parent_body: thigh_L}
+  - {name: hip_L_z,       axis: [0, 0, 1],  range_deg: [-40, 40],  torque: 50,  group: left,   parent_body: thigh_L}
+  - {name: knee_L,        axis: [0, 1, 0],  range_deg: [0, 150],   torque: 120, group: left,   parent_body: shin_L}
+  - {name: ankle_L_x,     axis: [0, -1, 0], range_deg: [-45, 30],  torque: 80,  group: left,   parent_body: foot_L}
+  - {name: ankle_L_y,     axis: [1, 0, 0],  range_deg: [-25, 25],  torque: 30,  group: left,   parent_body: foot_L}
+  - {name: shoulder_R_x,  axis: [0, -1, 0], range_deg: [-60, 170], torque: 40,  group: right,  parent_body: upper_arm_R}
+  - {name: shoulder_R_y,  axis: [-1, 0, 0], range_deg: [-30, 150], torque: 40,  group: right,  parent_body: upper_arm_R}
+  - {name: shoulder_R_z,  axis: [0, 0, -1], range_deg: [-80, 80],  torque: 25,  group: right,  parent_body: upper_arm_R}
+  - {name: elbow_R,       axis: [0, -1, 0], range_deg: [0, 150],   torque: 30,  group: right,  parent_body: forearm_R}
+  - {name: wrist_R,       axis: [0, -1, 0], range_deg: [-70, 70],  torque: 8,   group: right,  parent_body: hand_R}
+  - {name: hip_R_x,       axis: [0, -1, 0], range_deg: [-30, 120], torque: 120, group: right,  parent_body: thigh_R}
+  - {name: hip_R_y,       axis: [-1, 0, 0], range_deg: [-40, 40],  torque: 80,  group: right,  parent_body: thigh_R}
+  - {name: hip_R_z,       axis: [0, 0, -1], range_deg: [-40, 40],  torque: 50,  group: right,  parent_body: thigh_R}
+  - {name: knee_R,        axis: [0, 1, 0],  range_deg: [0, 150],   torque: 120, group: right,  parent_body: shin_R}
+  - {name: ankle_R_x,     axis: [0, -1, 0], range_deg: [-45, 30],  torque: 80,  group: right,  parent_body: foot_R}
+  - {name: ankle_R_y,     axis: [-1, 0, 0], range_deg: [-25, 25],  torque: 30,  group: right,  parent_body: foot_R}
