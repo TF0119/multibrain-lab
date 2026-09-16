@@ -1,2 +1,8 @@
 # Windows のダウンロード属性ファイル (WSL へコピーすると生成される)
 *:Zone.Identifier
+
+# データと実行結果は Git 管理対象外
+data/
+runs/
+.venv/
+__pycache__/
