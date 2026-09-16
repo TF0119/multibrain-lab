@@ -53,15 +53,19 @@ def test_total_mass(model):
 
 def test_sensor_counts(model):
     # 27 jointpos + 27 jointvel + framequat/gyro/velocimeter/framepos + 12 touch
-    assert model.nsensor == 27 + 27 + 4 + 12
+    # + 7 reward/success sensors (§3.5): framezaxis, 5 framelinvel, framexaxis
+    assert model.nsensor == 27 + 27 + 4 + 12 + 7
+    assert model.nsensordata == 100
     counts = {}
     for i in range(model.nsensor):
         counts[model.sensor_type[i]] = counts.get(model.sensor_type[i], 0) + 1
     assert counts[mujoco.mjtSensor.mjSENS_JOINTPOS] == 27
     assert counts[mujoco.mjtSensor.mjSENS_JOINTVEL] == 27
     assert counts[mujoco.mjtSensor.mjSENS_TOUCH] == 12
+    assert counts[mujoco.mjtSensor.mjSENS_FRAMELINVEL] == 5
     for t in (mujoco.mjtSensor.mjSENS_FRAMEQUAT, mujoco.mjtSensor.mjSENS_GYRO,
-              mujoco.mjtSensor.mjSENS_VELOCIMETER, mujoco.mjtSensor.mjSENS_FRAMEPOS):
+              mujoco.mjtSensor.mjSENS_VELOCIMETER, mujoco.mjtSensor.mjSENS_FRAMEPOS,
+              mujoco.mjtSensor.mjSENS_FRAMEZAXIS, mujoco.mjtSensor.mjSENS_FRAMEXAXIS):
         assert counts[t] == 1
 
 
@@ -134,10 +138,14 @@ def test_joint_axis_signs(model):
 
 
 def test_uncontrolled_fall(model):
-    """§3.8: ctrl=0 from standing -> falls within 2 s; final state has no NaN
-    and no geom resting below -0.02 m. The transient deepest point while
-    falling is not a pass criterion."""
+    """§3.8: ctrl=0 from standing with a 3 deg forward lean -> falls within
+    2 s; final state has no NaN and no geom resting below -0.02 m. The
+    transient deepest point while falling is not a pass criterion.
+    Without the lean the passive body is in a symmetric equilibrium (feet
+    loaded, knees on their extension limit) and stands indefinitely."""
     d = mujoco.MjData(model)
+    th = math.radians(3.0)
+    d.qpos[3:7] = [math.cos(th / 2), 0.0, math.sin(th / 2), 0.0]
     mujoco.mj_forward(model, d)
     z0 = d.qpos[2]
     for _ in range(400):  # 2 s at 5 ms

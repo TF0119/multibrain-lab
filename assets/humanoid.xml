@@ -17,6 +17,7 @@
       <joint name="waist_y" axis="1 0 0" range="-30 30"/>
       <joint name="waist_x" axis="0 -1 0" range="-60 30"/>
       <geom type="capsule" fromto="0 0 0 0 0 0.42" size="0.13" mass="15.0"/>
+      <site name="torso_frame"/>
       <site name="touch_chest" type="box" pos="0.10 0 0.24" size="0.06 0.12 0.18"/>
       <site name="touch_back" type="box" pos="-0.10 0 0.24" size="0.06 0.12 0.18"/>
       <body name="head" pos="0 0 0.48">
@@ -29,10 +30,10 @@
       <joint name="shoulder_L_x" axis="0 -1 0" range="-60 170"/>
       <joint name="shoulder_L_y" axis="1 0 0" range="-30 150"/>
       <joint name="shoulder_L_z" axis="0 0 1" range="-80 80"/>
-      <geom type="capsule" fromto="0 0 0 0 0 -0.26" size="0.045" mass="1.3"/>
+      <geom type="capsule" fromto="0 0 0 0 0 -0.215" size="0.045" mass="1.3"/>
       <body name="forearm_L" pos="0 0 -0.26">
       <joint name="elbow_L" axis="0 -1 0" range="0 150"/>
-      <geom type="capsule" fromto="0 0 0 0 0 -0.24" size="0.04" mass="0.7"/>
+      <geom type="capsule" fromto="0 0 0 0 0 -0.200" size="0.04" mass="0.7"/>
       <site name="touch_elbow_L" type="box" pos="0.04 0 -0.01" size="0.045 0.045 0.045"/>
       <body name="hand_L" pos="0 0 -0.24">
       <joint name="wrist_L" axis="0 -1 0" range="-70 70"/>
@@ -45,10 +46,10 @@
       <joint name="shoulder_R_x" axis="0 -1 0" range="-60 170"/>
       <joint name="shoulder_R_y" axis="-1 0 0" range="-30 150"/>
       <joint name="shoulder_R_z" axis="0 0 -1" range="-80 80"/>
-      <geom type="capsule" fromto="0 0 0 0 0 -0.26" size="0.045" mass="1.3"/>
+      <geom type="capsule" fromto="0 0 0 0 0 -0.215" size="0.045" mass="1.3"/>
       <body name="forearm_R" pos="0 0 -0.26">
       <joint name="elbow_R" axis="0 -1 0" range="0 150"/>
-      <geom type="capsule" fromto="0 0 0 0 0 -0.24" size="0.04" mass="0.7"/>
+      <geom type="capsule" fromto="0 0 0 0 0 -0.200" size="0.04" mass="0.7"/>
       <site name="touch_elbow_R" type="box" pos="0.04 0 -0.01" size="0.045 0.045 0.045"/>
       <body name="hand_R" pos="0 0 -0.24">
       <joint name="wrist_R" axis="0 -1 0" range="-70 70"/>
@@ -62,10 +63,10 @@
       <joint name="hip_L_x" axis="0 -1 0" range="-30 120"/>
       <joint name="hip_L_y" axis="1 0 0" range="-40 40"/>
       <joint name="hip_L_z" axis="0 0 1" range="-40 40"/>
-      <geom type="capsule" fromto="0 0 0 0 0 -0.38" size="0.06" mass="7.4"/>
+      <geom type="capsule" fromto="0 0 0 0 0 -0.320" size="0.06" mass="7.4"/>
       <body name="shin_L" pos="0 0 -0.38">
       <joint name="knee_L" axis="0 1 0" range="0 150"/>
-      <geom type="capsule" fromto="0 0 0 0 0 -0.37" size="0.045" mass="2.4"/>
+      <geom type="capsule" fromto="0 0 0 0 0 -0.325" size="0.045" mass="2.4"/>
       <site name="touch_knee_L" type="box" pos="0.05 0 -0.02" size="0.05 0.05 0.05"/>
       <body name="foot_L" pos="0 0 -0.37">
       <joint name="ankle_L_x" axis="0 -1 0" range="-45 30"/>
@@ -79,10 +80,10 @@
       <joint name="hip_R_x" axis="0 -1 0" range="-30 120"/>
       <joint name="hip_R_y" axis="-1 0 0" range="-40 40"/>
       <joint name="hip_R_z" axis="0 0 -1" range="-40 40"/>
-      <geom type="capsule" fromto="0 0 0 0 0 -0.38" size="0.06" mass="7.4"/>
+      <geom type="capsule" fromto="0 0 0 0 0 -0.320" size="0.06" mass="7.4"/>
       <body name="shin_R" pos="0 0 -0.38">
       <joint name="knee_R" axis="0 1 0" range="0 150"/>
-      <geom type="capsule" fromto="0 0 0 0 0 -0.37" size="0.045" mass="2.4"/>
+      <geom type="capsule" fromto="0 0 0 0 0 -0.325" size="0.045" mass="2.4"/>
       <site name="touch_knee_R" type="box" pos="0.05 0 -0.02" size="0.05 0.05 0.05"/>
       <body name="foot_R" pos="0 0 -0.37">
       <joint name="ankle_R_x" axis="0 -1 0" range="-45 30"/>
@@ -140,75 +141,82 @@
     <general name="ankle_R_y" joint="ankle_R_y" gear="30"/>
   </actuator>
   <sensor>
-    <jointpos joint="waist_z"/>
-    <jointpos joint="waist_y"/>
-    <jointpos joint="waist_x"/>
-    <jointpos joint="neck_y"/>
-    <jointpos joint="neck_z"/>
-    <jointpos joint="shoulder_L_x"/>
-    <jointpos joint="shoulder_L_y"/>
-    <jointpos joint="shoulder_L_z"/>
-    <jointpos joint="elbow_L"/>
-    <jointpos joint="wrist_L"/>
-    <jointpos joint="hip_L_x"/>
-    <jointpos joint="hip_L_y"/>
-    <jointpos joint="hip_L_z"/>
-    <jointpos joint="knee_L"/>
-    <jointpos joint="ankle_L_x"/>
-    <jointpos joint="ankle_L_y"/>
-    <jointpos joint="shoulder_R_x"/>
-    <jointpos joint="shoulder_R_y"/>
-    <jointpos joint="shoulder_R_z"/>
-    <jointpos joint="elbow_R"/>
-    <jointpos joint="wrist_R"/>
-    <jointpos joint="hip_R_x"/>
-    <jointpos joint="hip_R_y"/>
-    <jointpos joint="hip_R_z"/>
-    <jointpos joint="knee_R"/>
-    <jointpos joint="ankle_R_x"/>
-    <jointpos joint="ankle_R_y"/>
-    <jointvel joint="waist_z"/>
-    <jointvel joint="waist_y"/>
-    <jointvel joint="waist_x"/>
-    <jointvel joint="neck_y"/>
-    <jointvel joint="neck_z"/>
-    <jointvel joint="shoulder_L_x"/>
-    <jointvel joint="shoulder_L_y"/>
-    <jointvel joint="shoulder_L_z"/>
-    <jointvel joint="elbow_L"/>
-    <jointvel joint="wrist_L"/>
-    <jointvel joint="hip_L_x"/>
-    <jointvel joint="hip_L_y"/>
-    <jointvel joint="hip_L_z"/>
-    <jointvel joint="knee_L"/>
-    <jointvel joint="ankle_L_x"/>
-    <jointvel joint="ankle_L_y"/>
-    <jointvel joint="shoulder_R_x"/>
-    <jointvel joint="shoulder_R_y"/>
-    <jointvel joint="shoulder_R_z"/>
-    <jointvel joint="elbow_R"/>
-    <jointvel joint="wrist_R"/>
-    <jointvel joint="hip_R_x"/>
-    <jointvel joint="hip_R_y"/>
-    <jointvel joint="hip_R_z"/>
-    <jointvel joint="knee_R"/>
-    <jointvel joint="ankle_R_x"/>
-    <jointvel joint="ankle_R_y"/>
-    <framequat objtype="site" objname="imu"/>
-    <gyro site="imu"/>
-    <velocimeter site="imu"/>
-    <framepos objtype="site" objname="imu"/>
-    <touch site="touch_foot_L"/>
-    <touch site="touch_foot_R"/>
-    <touch site="touch_hand_L"/>
-    <touch site="touch_hand_R"/>
-    <touch site="touch_knee_L"/>
-    <touch site="touch_knee_R"/>
-    <touch site="touch_elbow_L"/>
-    <touch site="touch_elbow_R"/>
-    <touch site="touch_pelvis"/>
-    <touch site="touch_chest"/>
-    <touch site="touch_back"/>
-    <touch site="touch_head"/>
+    <jointpos name="jointpos_waist_z" joint="waist_z"/>
+    <jointpos name="jointpos_waist_y" joint="waist_y"/>
+    <jointpos name="jointpos_waist_x" joint="waist_x"/>
+    <jointpos name="jointpos_neck_y" joint="neck_y"/>
+    <jointpos name="jointpos_neck_z" joint="neck_z"/>
+    <jointpos name="jointpos_shoulder_L_x" joint="shoulder_L_x"/>
+    <jointpos name="jointpos_shoulder_L_y" joint="shoulder_L_y"/>
+    <jointpos name="jointpos_shoulder_L_z" joint="shoulder_L_z"/>
+    <jointpos name="jointpos_elbow_L" joint="elbow_L"/>
+    <jointpos name="jointpos_wrist_L" joint="wrist_L"/>
+    <jointpos name="jointpos_hip_L_x" joint="hip_L_x"/>
+    <jointpos name="jointpos_hip_L_y" joint="hip_L_y"/>
+    <jointpos name="jointpos_hip_L_z" joint="hip_L_z"/>
+    <jointpos name="jointpos_knee_L" joint="knee_L"/>
+    <jointpos name="jointpos_ankle_L_x" joint="ankle_L_x"/>
+    <jointpos name="jointpos_ankle_L_y" joint="ankle_L_y"/>
+    <jointpos name="jointpos_shoulder_R_x" joint="shoulder_R_x"/>
+    <jointpos name="jointpos_shoulder_R_y" joint="shoulder_R_y"/>
+    <jointpos name="jointpos_shoulder_R_z" joint="shoulder_R_z"/>
+    <jointpos name="jointpos_elbow_R" joint="elbow_R"/>
+    <jointpos name="jointpos_wrist_R" joint="wrist_R"/>
+    <jointpos name="jointpos_hip_R_x" joint="hip_R_x"/>
+    <jointpos name="jointpos_hip_R_y" joint="hip_R_y"/>
+    <jointpos name="jointpos_hip_R_z" joint="hip_R_z"/>
+    <jointpos name="jointpos_knee_R" joint="knee_R"/>
+    <jointpos name="jointpos_ankle_R_x" joint="ankle_R_x"/>
+    <jointpos name="jointpos_ankle_R_y" joint="ankle_R_y"/>
+    <jointvel name="jointvel_waist_z" joint="waist_z"/>
+    <jointvel name="jointvel_waist_y" joint="waist_y"/>
+    <jointvel name="jointvel_waist_x" joint="waist_x"/>
+    <jointvel name="jointvel_neck_y" joint="neck_y"/>
+    <jointvel name="jointvel_neck_z" joint="neck_z"/>
+    <jointvel name="jointvel_shoulder_L_x" joint="shoulder_L_x"/>
+    <jointvel name="jointvel_shoulder_L_y" joint="shoulder_L_y"/>
+    <jointvel name="jointvel_shoulder_L_z" joint="shoulder_L_z"/>
+    <jointvel name="jointvel_elbow_L" joint="elbow_L"/>
+    <jointvel name="jointvel_wrist_L" joint="wrist_L"/>
+    <jointvel name="jointvel_hip_L_x" joint="hip_L_x"/>
+    <jointvel name="jointvel_hip_L_y" joint="hip_L_y"/>
+    <jointvel name="jointvel_hip_L_z" joint="hip_L_z"/>
+    <jointvel name="jointvel_knee_L" joint="knee_L"/>
+    <jointvel name="jointvel_ankle_L_x" joint="ankle_L_x"/>
+    <jointvel name="jointvel_ankle_L_y" joint="ankle_L_y"/>
+    <jointvel name="jointvel_shoulder_R_x" joint="shoulder_R_x"/>
+    <jointvel name="jointvel_shoulder_R_y" joint="shoulder_R_y"/>
+    <jointvel name="jointvel_shoulder_R_z" joint="shoulder_R_z"/>
+    <jointvel name="jointvel_elbow_R" joint="elbow_R"/>
+    <jointvel name="jointvel_wrist_R" joint="wrist_R"/>
+    <jointvel name="jointvel_hip_R_x" joint="hip_R_x"/>
+    <jointvel name="jointvel_hip_R_y" joint="hip_R_y"/>
+    <jointvel name="jointvel_hip_R_z" joint="hip_R_z"/>
+    <jointvel name="jointvel_knee_R" joint="knee_R"/>
+    <jointvel name="jointvel_ankle_R_x" joint="ankle_R_x"/>
+    <jointvel name="jointvel_ankle_R_y" joint="ankle_R_y"/>
+    <framequat name="framequat_imu" objtype="site" objname="imu"/>
+    <gyro name="gyro_imu" site="imu"/>
+    <velocimeter name="velocimeter_imu" site="imu"/>
+    <framepos name="framepos_imu" objtype="site" objname="imu"/>
+    <touch name="touch_foot_L" site="touch_foot_L"/>
+    <touch name="touch_foot_R" site="touch_foot_R"/>
+    <touch name="touch_hand_L" site="touch_hand_L"/>
+    <touch name="touch_hand_R" site="touch_hand_R"/>
+    <touch name="touch_knee_L" site="touch_knee_L"/>
+    <touch name="touch_knee_R" site="touch_knee_R"/>
+    <touch name="touch_elbow_L" site="touch_elbow_L"/>
+    <touch name="touch_elbow_R" site="touch_elbow_R"/>
+    <touch name="touch_pelvis" site="touch_pelvis"/>
+    <touch name="touch_chest" site="touch_chest"/>
+    <touch name="touch_back" site="touch_back"/>
+    <touch name="touch_head" site="touch_head"/>
+    <framezaxis name="framezaxis_torso" objtype="site" objname="torso_frame"/>
+    <framelinvel name="framelinvel_imu" objtype="site" objname="imu"/>
+    <framelinvel name="framelinvel_touch_head" objtype="site" objname="touch_head"/>
+    <framelinvel name="framelinvel_touch_chest" objtype="site" objname="touch_chest"/>
+    <framelinvel name="framelinvel_touch_back" objtype="site" objname="touch_back"/>
+    <framelinvel name="framelinvel_touch_pelvis" objtype="site" objname="touch_pelvis"/>
+    <framexaxis name="framexaxis_touch_head" objtype="site" objname="touch_head"/>
   </sensor>
 </mujoco>

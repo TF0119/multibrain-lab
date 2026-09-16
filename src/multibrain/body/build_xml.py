@@ -43,6 +43,17 @@ UPPER_ARM_LEN = 0.26
 FOREARM_LEN = 0.24
 THIGH_LEN = 0.38
 SHIN_LEN = 0.37
+# capsule radii. Each limb capsule ends one radius short of its child joint
+# so that the capsule's end hemisphere reaches exactly the joint centre and
+# the child's geom (foot box, shin, forearm, hand) is the outermost body at
+# that joint. Otherwise the shin tip sits 5 mm below the sole at standing
+# rest (the model then rests on the shin tips, the feet carry no load and
+# the foot touch sensors read 0), and kneeling lands on the thigh tip
+# instead of the shin, which the knee touch site (on the shin) cannot see.
+THIGH_R = 0.06
+SHIN_R = 0.045
+UPPER_ARM_R = 0.045
+FOREARM_R = 0.04
 
 # masses from §3.1 (kg); torso = upper trunk 7.7 + mid trunk 7.3
 MASS = {
@@ -86,6 +97,10 @@ BODY_TOUCH_SITES = {}
 for _name, _body, _pos, _size in TOUCH_SITES:
     BODY_TOUCH_SITES.setdefault(_body, []).append((_name, _pos, _size))
 
+# sites whose impact velocity is penalized by the pain term (§5.3), in the
+# order used for the reward sensors and BodyLayout.impact_* (§3.5)
+IMPACT_SITES = ["touch_head", "touch_chest", "touch_back", "touch_pelvis"]
+
 
 def _joints_for(joints, body):
     return [j for j in joints if j["parent_body"] == body]
@@ -109,12 +124,12 @@ def _leg(joints, side):
     sy = 1.0 if side == "L" else -1.0
     s = f'      <body name="thigh_{side}" pos="0 {sy * HIP_LATERAL} -{HIP_DROP}">\n'
     s += "".join(_joint_xml(j) for j in _joints_for(joints, f"thigh_{side}"))
-    s += (f'      <geom type="capsule" fromto="0 0 0 0 0 -{THIGH_LEN}" size="0.06" '
-          f'mass="{MASS["thigh"]}"/>\n')
+    s += (f'      <geom type="capsule" fromto="0 0 0 0 0 -{THIGH_LEN - THIGH_R:.3f}" '
+          f'size="{THIGH_R}" mass="{MASS["thigh"]}"/>\n')
     s += f'      <body name="shin_{side}" pos="0 0 -{THIGH_LEN}">\n'
     s += "".join(_joint_xml(j) for j in _joints_for(joints, f"shin_{side}"))
-    s += (f'      <geom type="capsule" fromto="0 0 0 0 0 -{SHIN_LEN}" size="0.045" '
-          f'mass="{MASS["shin"]}"/>\n')
+    s += (f'      <geom type="capsule" fromto="0 0 0 0 0 -{SHIN_LEN - SHIN_R:.3f}" '
+          f'size="{SHIN_R}" mass="{MASS["shin"]}"/>\n')
     s += _sites_xml(f"shin_{side}")
     s += f'      <body name="foot_{side}" pos="0 0 -{SHIN_LEN}">\n'
     s += "".join(_joint_xml(j) for j in _joints_for(joints, f"foot_{side}"))
@@ -130,12 +145,12 @@ def _arm(joints, side):
     sy = 1.0 if side == "L" else -1.0
     s = f'      <body name="upper_arm_{side}" pos="0 {sy * SHOULDER_Y} {SHOULDER_Z}">\n'
     s += "".join(_joint_xml(j) for j in _joints_for(joints, f"upper_arm_{side}"))
-    s += (f'      <geom type="capsule" fromto="0 0 0 0 0 -{UPPER_ARM_LEN}" size="0.045" '
-          f'mass="{MASS["upper_arm"]}"/>\n')
+    s += (f'      <geom type="capsule" fromto="0 0 0 0 0 -{UPPER_ARM_LEN - UPPER_ARM_R:.3f}" '
+          f'size="{UPPER_ARM_R}" mass="{MASS["upper_arm"]}"/>\n')
     s += f'      <body name="forearm_{side}" pos="0 0 -{UPPER_ARM_LEN}">\n'
     s += "".join(_joint_xml(j) for j in _joints_for(joints, f"forearm_{side}"))
-    s += (f'      <geom type="capsule" fromto="0 0 0 0 0 -{FOREARM_LEN}" size="0.04" '
-          f'mass="{MASS["forearm"]}"/>\n')
+    s += (f'      <geom type="capsule" fromto="0 0 0 0 0 -{FOREARM_LEN - FOREARM_R:.3f}" '
+          f'size="{FOREARM_R}" mass="{MASS["forearm"]}"/>\n')
     s += _sites_xml(f"forearm_{side}")
     s += f'      <body name="hand_{side}" pos="0 0 -{FOREARM_LEN}">\n'
     s += "".join(_joint_xml(j) for j in _joints_for(joints, f"hand_{side}"))
@@ -186,6 +201,10 @@ def build_xml(joint_groups_path=DEFAULT_JOINT_GROUPS):
     x += "".join(_joint_xml(j) for j in _joints_for(joints, "torso"))
     x += (f'      <geom type="capsule" fromto="0 0 0 0 0 {TORSO_LEN}" '
           f'size="{TORSO_RADIUS}" mass="{MASS["torso"]}"/>\n')
+    # frame site for the tilt sensor: a frame sensor with objtype="body" reads
+    # the body's *inertial* frame, whose principal axes for a symmetric capsule
+    # come out flipped (z = -1 when upright); a site carries the body frame.
+    x += '      <site name="torso_frame"/>\n'
     x += _sites_xml("torso")
     x += f'      <body name="head" pos="0 0 {NECK_Z}">\n'
     x += "".join(_joint_xml(j) for j in _joints_for(joints, "head"))
@@ -209,17 +228,28 @@ def build_xml(joint_groups_path=DEFAULT_JOINT_GROUPS):
         x += f'    <general name="{j["name"]}" joint="{j["name"]}" gear="{j["torque"]}"/>\n'
     x += "  </actuator>\n"
 
+    # Sensor names double as the lookup keys in BodyLayout (§3.5: sensordata
+    # is indexed by name, never by hard-coded position). Sensor and site names
+    # live in separate namespaces, so a touch sensor may share its site name.
     x += "  <sensor>\n"
     for j in joints:
-        x += f'    <jointpos joint="{j["name"]}"/>\n'
+        x += f'    <jointpos name="jointpos_{j["name"]}" joint="{j["name"]}"/>\n'
     for j in joints:
-        x += f'    <jointvel joint="{j["name"]}"/>\n'
-    x += '    <framequat objtype="site" objname="imu"/>\n'
-    x += '    <gyro site="imu"/>\n'
-    x += '    <velocimeter site="imu"/>\n'
-    x += '    <framepos objtype="site" objname="imu"/>\n'
+        x += f'    <jointvel name="jointvel_{j["name"]}" joint="{j["name"]}"/>\n'
+    x += '    <framequat name="framequat_imu" objtype="site" objname="imu"/>\n'
+    x += '    <gyro name="gyro_imu" site="imu"/>\n'
+    x += '    <velocimeter name="velocimeter_imu" site="imu"/>\n'
+    x += '    <framepos name="framepos_imu" objtype="site" objname="imu"/>\n'
     for name, _, _, _ in TOUCH_SITES:
-        x += f'    <touch site="{name}"/>\n'
+        x += f'    <touch name="{name}" site="{name}"/>\n'
+    # reward/success-judgment sensors (§3.5 second table); not part of the obs
+    x += '    <framezaxis name="framezaxis_torso" objtype="site" objname="torso_frame"/>\n'
+    x += '    <framelinvel name="framelinvel_imu" objtype="site" objname="imu"/>\n'
+    for site in IMPACT_SITES:
+        x += (f'    <framelinvel name="framelinvel_{site}" objtype="site" '
+              f'objname="{site}"/>\n')
+    x += ('    <framexaxis name="framexaxis_touch_head" objtype="site" '
+          'objname="touch_head"/>\n')
     x += "  </sensor>\n</mujoco>\n"
     return x
 

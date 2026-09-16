@@ -186,6 +186,9 @@ M0 の実測では、乱数トルクで動かした 1 環境あたりの最大�
 
 接触サイトは覆うジオムより数 mm 大きくする。
 `touch` センサはサイトの内部にある接触点の法線力だけを合計するため、ジオムと同寸のサイトでは表面の接触点が境界上に乗って常に 0 になる（M1 の準備で確認した）。
+四肢のカプセルは子関節の手前で半径ぶん短く終え、端の半球がちょうど関節中心に届くようにする。
+関節間の長さ（§3.1）は体節の位置で保つ。
+そうしないと立位で脛の先端が足裏より 5 mm 下に出て床にめり込み、足が荷重を受けずに接触センサが 0 のまま身体が跳ね上がる。膝立ちでも大腿の先端が先に床に着き、脛にある膝のサイトが接触を拾えない。
 
 ### 3.5 センサと観測ベクトル
 
@@ -210,7 +213,7 @@ M0 の実測では、乱数トルクで動かした 1 環境あたりの最大�
 
 | 用途 | MuJoCo センサ | 値 |
 |---|---|---|
-| 胴体の傾き | `framezaxis`（`torso`） | 3 |
+| 胴体の傾き | `framezaxis`（胴の `torso_frame` サイト。`objtype="body"` は慣性系を返して軸が反転するので使わない） | 3 |
 | 骨盤の世界座標での速度 | `framelinvel`（`imu` サイト） | 3 |
 | 衝撃の速度 | `framelinvel`（`touch_head`、`touch_chest`、`touch_back`、`touch_pelvis` の各サイト） | 12 |
 | 顔の向き | `framexaxis`（`touch_head` サイト） | 3 |
@@ -253,19 +256,19 @@ M0 で 4 物理ステップを一つの CUDA グラフに取り込んで測っ�
         <joint name="hip_L_x" axis="0 -1 0" range="-30 120"/>
         <joint name="hip_L_y" axis="1 0 0" range="-40 40"/>
         <joint name="hip_L_z" axis="0 0 1" range="-40 40"/>
-        <geom type="capsule" fromto="0 0 0 0 0 -0.38" size="0.06" mass="7.4"/>
+        <geom type="capsule" fromto="0 0 0 0 0 -0.32" size="0.06" mass="7.4"/>
         <body name="shin_L" pos="0 0 -0.38">
           <joint name="knee_L" axis="0 1 0" range="0 150"/>
-          <geom type="capsule" fromto="0 0 0 0 0 -0.37" size="0.045" mass="2.4"/>
+          <geom type="capsule" fromto="0 0 0 0 0 -0.325" size="0.045" mass="2.4"/>
           <body name="foot_L" pos="0 0 -0.37">
             <joint name="ankle_L_x" axis="0 -1 0" range="-45 30"/>
             <joint name="ankle_L_y" axis="1 0 0" range="-25 25"/>
             <geom type="box" pos="0.04 0 -0.02" size="0.11 0.045 0.02" mass="0.65"/>
-            <site name="foot_L_contact" type="box" pos="0.04 0 -0.02" size="0.11 0.045 0.02"/>
+            <site name="touch_foot_L" type="box" pos="0.04 0 -0.02" size="0.115 0.05 0.025"/>
           </body>
         </body>
       </body>
-      <!-- thigh_R、torso（waist_*、head、upper_arm_*）は同じ形式 -->
+      <!-- thigh_R は pos="0 -0.09 -0.05" で同じ形式。torso（waist_*、head、upper_arm_* は肩 y=±0.20）も同様 -->
     </body>
   </worldbody>
   <contact>
@@ -295,7 +298,7 @@ M0 で 4 物理ステップを一つの CUDA グラフに取り込んで測っ�
 
 M1 では次を通す。
 
-- 立位から静かに置いた身体が、操作なしで 2 秒以内に倒れ（骨盤高が初期の 70% 未満）、数値異常を出さず、倒れて静止した状態で床への沈み込みが 2 cm 以内である。倒れる途中の一時的な貫通は記録するだけで合否には使わない。
+- 立位から前へ 3 度傾けて静かに置いた身体が、操作なしで 2 秒以内に倒れ（骨盤高が初期の 70% 未満）、数値異常を出さず、倒れて静止した状態で床への沈み込みが 2 cm 以内である。傾けないと受動的な身体は左右対称の釣り合いのまま立ち続けるので、傾きを与える。倒れる途中の一時的な貫通は記録するだけで合否には使わない。
 - 各関節を可動域の端まで動かしても、数値発散や接触の貫通が起きない。
 - 保存した既知の姿勢（立位、膝立ち、仰向け、うつ伏せ、横向き）に対して成功判定と接触分類が正しい。
 - `mlp_control` が G1 の予算内で習得する。
