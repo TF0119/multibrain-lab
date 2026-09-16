@@ -6,3 +6,6 @@ data/
 runs/
 .venv/
 __pycache__/
+
+# 表示用の VRM モデルは配布条件があるため同梱しない
+assets/*.vrm
