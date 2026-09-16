@@ -11,3 +11,4 @@ __pycache__/
 assets/*.vrm
 
 MUJOCO_LOG.TXT
+*.egg-info/
