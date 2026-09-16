@@ -11,19 +11,19 @@
       <freejoint/>
       <geom type="box" size="0.14 0.09 0.09" mass="6.2"/>
       <site name="imu"/>
-      <site name="touch_pelvis" type="box" pos="0 0 0" size="0.14 0.09 0.09"/>
+      <site name="touch_pelvis" type="box" pos="0 0 0" size="0.145 0.095 0.095"/>
       <body name="torso" pos="0 0 0.12">
       <joint name="waist_z" axis="0 0 1" range="-40 40"/>
       <joint name="waist_y" axis="1 0 0" range="-30 30"/>
       <joint name="waist_x" axis="0 -1 0" range="-60 30"/>
       <geom type="capsule" fromto="0 0 0 0 0 0.42" size="0.13" mass="15.0"/>
-      <site name="touch_chest" type="box" pos="0.13 0 0.30" size="0.03 0.10 0.08"/>
-      <site name="touch_back" type="box" pos="-0.13 0 0.30" size="0.03 0.10 0.08"/>
+      <site name="touch_chest" type="box" pos="0.10 0 0.24" size="0.06 0.12 0.18"/>
+      <site name="touch_back" type="box" pos="-0.10 0 0.24" size="0.06 0.12 0.18"/>
       <body name="head" pos="0 0 0.48">
       <joint name="neck_y" axis="1 0 0" range="-45 45"/>
       <joint name="neck_z" axis="0 0 1" range="-60 60"/>
       <geom type="sphere" pos="0 0 0.06" size="0.09" mass="3.3"/>
-      <site name="touch_head" type="box" pos="0 0 0.06" size="0.09 0.09 0.09"/>
+      <site name="touch_head" type="box" pos="0 0 0.06" size="0.095 0.095 0.095"/>
       </body>
       <body name="upper_arm_L" pos="0 0.2 0.38">
       <joint name="shoulder_L_x" axis="0 -1 0" range="-60 170"/>
@@ -37,11 +37,11 @@
       <body name="hand_L" pos="0 0 -0.24">
       <joint name="wrist_L" axis="0 -1 0" range="-70 70"/>
       <geom type="box" pos="0 0 -0.045" size="0.035 0.045 0.045" mass="0.3"/>
-      <site name="touch_hand_L" type="box" pos="0 0 -0.045" size="0.04 0.045 0.045"/>
+      <site name="touch_hand_L" type="box" pos="0 0 -0.045" size="0.045 0.05 0.05"/>
       </body>
       </body>
       </body>
-      <body name="upper_arm_R" pos="0 0.2 0.38">
+      <body name="upper_arm_R" pos="0 -0.2 0.38">
       <joint name="shoulder_R_x" axis="0 -1 0" range="-60 170"/>
       <joint name="shoulder_R_y" axis="-1 0 0" range="-30 150"/>
       <joint name="shoulder_R_z" axis="0 0 -1" range="-80 80"/>
@@ -53,7 +53,7 @@
       <body name="hand_R" pos="0 0 -0.24">
       <joint name="wrist_R" axis="0 -1 0" range="-70 70"/>
       <geom type="box" pos="0 0 -0.045" size="0.035 0.045 0.045" mass="0.3"/>
-      <site name="touch_hand_R" type="box" pos="0 0 -0.045" size="0.04 0.045 0.045"/>
+      <site name="touch_hand_R" type="box" pos="0 0 -0.045" size="0.045 0.05 0.05"/>
       </body>
       </body>
       </body>
@@ -71,11 +71,11 @@
       <joint name="ankle_L_x" axis="0 -1 0" range="-45 30"/>
       <joint name="ankle_L_y" axis="1 0 0" range="-25 25"/>
       <geom type="box" pos="0.04 0 -0.02" size="0.11 0.045 0.02" mass="0.65"/>
-      <site name="touch_foot_L" type="box" pos="0.04 0 -0.02" size="0.11 0.045 0.02"/>
+      <site name="touch_foot_L" type="box" pos="0.04 0 -0.02" size="0.115 0.05 0.025"/>
       </body>
       </body>
       </body>
-      <body name="thigh_R" pos="0 0.09 -0.05">
+      <body name="thigh_R" pos="0 -0.09 -0.05">
       <joint name="hip_R_x" axis="0 -1 0" range="-30 120"/>
       <joint name="hip_R_y" axis="-1 0 0" range="-40 40"/>
       <joint name="hip_R_z" axis="0 0 -1" range="-40 40"/>
@@ -88,7 +88,7 @@
       <joint name="ankle_R_x" axis="0 -1 0" range="-45 30"/>
       <joint name="ankle_R_y" axis="-1 0 0" range="-25 25"/>
       <geom type="box" pos="0.04 0 -0.02" size="0.11 0.045 0.02" mass="0.65"/>
-      <site name="touch_foot_R" type="box" pos="0.04 0 -0.02" size="0.11 0.045 0.02"/>
+      <site name="touch_foot_R" type="box" pos="0.04 0 -0.02" size="0.115 0.05 0.025"/>
       </body>
       </body>
       </body>

@@ -51,20 +51,24 @@ MASS = {
     "thigh": 7.4, "shin": 2.4, "foot": 0.65,
 }
 
-# touch sites: name -> (body, pos, size) — 12 sites per §3.5
+# touch sites: name -> (body, pos, size) — 12 sites per §3.5.
+# A touch sensor sums the normal force of contact *points* strictly inside
+# the site, so each site must extend a few mm beyond the surface it covers;
+# a site flush with its geom never sees the corner/face contact points
+# (verified against MuJoCo: a site of the same size as the geom reads 0).
 TOUCH_SITES = [
-    ("touch_foot_L",  "foot_L",    "0.04 0 -0.02", "0.11 0.045 0.02"),
-    ("touch_foot_R",  "foot_R",    "0.04 0 -0.02", "0.11 0.045 0.02"),
-    ("touch_hand_L",  "hand_L",    "0 0 -0.045",   "0.04 0.045 0.045"),
-    ("touch_hand_R",  "hand_R",    "0 0 -0.045",   "0.04 0.045 0.045"),
+    ("touch_foot_L",  "foot_L",    "0.04 0 -0.02", "0.115 0.05 0.025"),
+    ("touch_foot_R",  "foot_R",    "0.04 0 -0.02", "0.115 0.05 0.025"),
+    ("touch_hand_L",  "hand_L",    "0 0 -0.045",   "0.045 0.05 0.05"),
+    ("touch_hand_R",  "hand_R",    "0 0 -0.045",   "0.045 0.05 0.05"),
     ("touch_knee_L",  "shin_L",    "0.05 0 -0.02", "0.05 0.05 0.05"),
     ("touch_knee_R",  "shin_R",    "0.05 0 -0.02", "0.05 0.05 0.05"),
     ("touch_elbow_L", "forearm_L", "0.04 0 -0.01", "0.045 0.045 0.045"),
     ("touch_elbow_R", "forearm_R", "0.04 0 -0.01", "0.045 0.045 0.045"),
-    ("touch_pelvis",  "pelvis",    "0 0 0",        "0.14 0.09 0.09"),
-    ("touch_chest",   "torso",     "0.13 0 0.30",  "0.03 0.10 0.08"),
-    ("touch_back",    "torso",     "-0.13 0 0.30", "0.03 0.10 0.08"),
-    ("touch_head",    "head",      f"0 0 {HEAD_Z}", f"{HEAD_R} {HEAD_R} {HEAD_R}"),
+    ("touch_pelvis",  "pelvis",    "0 0 0",        "0.145 0.095 0.095"),
+    ("touch_chest",   "torso",     "0.10 0 0.24",  "0.06 0.12 0.18"),
+    ("touch_back",    "torso",     "-0.10 0 0.24", "0.06 0.12 0.18"),
+    ("touch_head",    "head",      f"0 0 {HEAD_Z}", "0.095 0.095 0.095"),
 ]
 
 # parent-child body pairs excluded from contact (§3.4)
@@ -101,7 +105,9 @@ def _sites_xml(body):
 
 
 def _leg(joints, side):
-    s = f'      <body name="thigh_{side}" pos="0 {HIP_LATERAL} -{HIP_DROP}">\n'
+    # left limbs sit at +y, right limbs at -y (§3.1: hips 0.09 off the midline)
+    sy = 1.0 if side == "L" else -1.0
+    s = f'      <body name="thigh_{side}" pos="0 {sy * HIP_LATERAL} -{HIP_DROP}">\n'
     s += "".join(_joint_xml(j) for j in _joints_for(joints, f"thigh_{side}"))
     s += (f'      <geom type="capsule" fromto="0 0 0 0 0 -{THIGH_LEN}" size="0.06" '
           f'mass="{MASS["thigh"]}"/>\n')
@@ -120,7 +126,9 @@ def _leg(joints, side):
 
 
 def _arm(joints, side):
-    s = f'      <body name="upper_arm_{side}" pos="0 {SHOULDER_Y} {SHOULDER_Z}">\n'
+    # shoulders are 0.20 left/right of the torso midline (§3.1)
+    sy = 1.0 if side == "L" else -1.0
+    s = f'      <body name="upper_arm_{side}" pos="0 {sy * SHOULDER_Y} {SHOULDER_Z}">\n'
     s += "".join(_joint_xml(j) for j in _joints_for(joints, f"upper_arm_{side}"))
     s += (f'      <geom type="capsule" fromto="0 0 0 0 0 -{UPPER_ARM_LEN}" size="0.045" '
           f'mass="{MASS["upper_arm"]}"/>\n')
