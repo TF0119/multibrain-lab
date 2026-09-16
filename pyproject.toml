@@ -17,6 +17,7 @@ dependencies = [
   "mujoco",
   "warp-lang",
   "mujoco-warp",
+  "websockets>=12",
 ]
 
 [project.optional-dependencies]
