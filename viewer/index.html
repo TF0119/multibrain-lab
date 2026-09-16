@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MultiBrain Lab viewer</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="hud">
+      <div id="status">接続待ち ws://127.0.0.1:8765</div>
+      <div id="info"></div>
+      <div id="controls">
+        <button data-view="both" class="on">両方</button>
+        <button data-view="vrm">VRM</button>
+        <button data-view="stick">人形</button>
+      </div>
+      <div id="log"></div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

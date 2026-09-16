@@ -12,3 +12,7 @@ assets/*.vrm
 
 MUJOCO_LOG.TXT
 *.egg-info/
+
+# viewer の JS 依存とビルド成果物
+node_modules/
+viewer/dist/
