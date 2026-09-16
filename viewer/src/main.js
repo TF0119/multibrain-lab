@@ -6,6 +6,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { VRMLoaderPlugin } from '@pixiv/three-vrm';
 import { decodeFrame, fk } from './protocol.js';
+import { MAGIC_ACTIVITY, decodeActivityFrame, ActivityHud } from './activity.js';
 
 // 接続先は ?ws=ws://host:port か ?port=8975 で上書きできる（既定 8765）。
 const qs = new URLSearchParams(location.search);
@@ -244,7 +245,7 @@ let viewMode = 'both';
 
 function setView(mode) {
   viewMode = mode;
-  for (const btn of document.querySelectorAll('#controls button')) {
+  for (const btn of document.querySelectorAll('#controls button[data-view]')) {
     btn.classList.toggle('on', btn.dataset.view === mode);
   }
   const showVrm = mode !== 'stick' && vrmDriver;
@@ -252,8 +253,18 @@ function setView(mode) {
   if (vrmDriver) vrmDriver.vrm.scene.visible = showVrm;
   if (stick) stick.group.visible = showStick;
 }
-document.querySelectorAll('#controls button').forEach((btn) => {
+document.querySelectorAll('#controls button[data-view]').forEach((btn) => {
   btn.addEventListener('click', () => setView(btn.dataset.view));
+});
+
+// 活動 HUD（PLAN §11.2）。meta.activity が無い条件では隠したまま。
+let activityHud = null;
+let activityOn = true;
+const actBtn = document.querySelector('#controls button[data-activity]');
+actBtn?.addEventListener('click', () => {
+  activityOn = !activityOn;
+  actBtn.classList.toggle('on', activityOn);
+  activityHud?.setVisible(activityOn);
 });
 
 function loadVrm() {
@@ -276,6 +287,15 @@ function onMeta(msg) {
   scene.add(stick.group);
   loadVrm();
   setView('both');
+  const actEl = document.getElementById('activity');
+  if (meta.activity) {
+    actEl.replaceChildren();
+    activityHud = new ActivityHud(actEl, meta.activity);
+    activityHud.setVisible(activityOn);
+  } else {
+    activityHud = null;
+    actEl.style.display = 'none';
+  }
   log(`meta: ${meta.bodies.length} bodies, ${meta.joints.length} joints` +
       `${meta.condition ? ` (${meta.condition})` : ''}`);
 }
@@ -294,7 +314,15 @@ function connect() {
       if (typeof ev.data === 'string') {
         onMeta(JSON.parse(ev.data));
       } else {
-        latest = decodeFrame(ev.data);
+        // 先頭 4 バイトで MBP1（姿勢）と MBA1（活動）を振り分ける。
+        const dv = new DataView(ev.data);
+        const magic = String.fromCharCode(
+          dv.getUint8(0), dv.getUint8(1), dv.getUint8(2), dv.getUint8(3));
+        if (magic === MAGIC_ACTIVITY) {
+          activityHud?.push(decodeActivityFrame(ev.data));
+        } else {
+          latest = decodeFrame(ev.data);
+        }
       }
     } catch (e) {
       log(`frame error: ${e.message}`);
@@ -326,6 +354,7 @@ function tick() {
     infoEl.textContent =
       `t=${latest.t.toFixed(2)}s seq=${latest.seq} ${fps}fps`;
   }
+  activityHud?.render();
   controls.update();
   renderer.render(scene, camera);
 }
