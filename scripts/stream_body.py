@@ -44,8 +44,8 @@ def poses_start(mjm, pose):
     d = mujoco.MjData(mjm)
     quat, z = {
         "standing": ((1.0, 0.0, 0.0, 0.0), 0.84),
-        "supine": ((math.cos(math.pi / 4), 0.0, math.sin(math.pi / 4), 0.0), 0.20),
-        "prone": ((math.cos(math.pi / 4), 0.0, -math.sin(math.pi / 4), 0.0), 0.20),
+        "supine": ((math.cos(math.pi / 4), 0.0, -math.sin(math.pi / 4), 0.0), 0.20),
+        "prone": ((math.cos(math.pi / 4), 0.0, math.sin(math.pi / 4), 0.0), 0.20),
     }[pose]
     d.qpos[2] = z
     d.qpos[3:7] = quat

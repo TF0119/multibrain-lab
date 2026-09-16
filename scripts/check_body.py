@@ -42,8 +42,13 @@ def lowest_geom_z(model, d):
     return lo
 
 
+FALL_LEAN_DEG = 3.0   # §3.8: the symmetric passive body stands forever without a lean
+
+
 def cpu_checks(model):
     d = mujoco.MjData(model)
+    th = math.radians(FALL_LEAN_DEG)
+    d.qpos[3:7] = [math.cos(th / 2), 0.0, math.sin(th / 2), 0.0]
     mujoco.mj_forward(model, d)
     z0 = float(d.qpos[2])
     lo = math.inf
@@ -87,11 +92,13 @@ def cpu_checks(model):
     return {"fall": fall, "ctrl_extremes": extremes}
 
 
-# pose qpos[3:7] quaternions (w, x, y, z) for the pelvis freejoint, and z heights
+# pose qpos[3:7] quaternions (w, x, y, z) for the pelvis freejoint, and z heights.
+# Pitch about +y by -90 deg lays the body on its back (chest up, gravity -x in
+# the pelvis frame); +90 deg is face-down. Earlier versions had these swapped.
 POSES = {
     "standing": ([1.0, 0.0, 0.0, 0.0], 0.84),
-    "supine":   ([math.cos(math.pi / 4), 0.0, math.sin(math.pi / 4), 0.0], 0.20),
-    "prone":    ([math.cos(math.pi / 4), 0.0, -math.sin(math.pi / 4), 0.0], 0.20),
+    "supine":   ([math.cos(math.pi / 4), 0.0, -math.sin(math.pi / 4), 0.0], 0.20),
+    "prone":    ([math.cos(math.pi / 4), 0.0, math.sin(math.pi / 4), 0.0], 0.20),
     "side":     ([math.cos(math.pi / 4), math.sin(math.pi / 4), 0.0, 0.0], 0.20),
 }
 
