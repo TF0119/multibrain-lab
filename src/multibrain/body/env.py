@@ -207,6 +207,32 @@ class WarpBodyEnv:
         self._release_stream()
         return obs
 
+    def reset_to(self, qpos_rows) -> torch.Tensor:
+        """Reset every world to the given (nworld, nq) qpos rows -> obs.
+
+        Evaluation entry point (§5.2: fixed start conditions). Same
+        bookkeeping as reset(): zero qvel/act/ctrl/time, one forward,
+        reward/tracker/episode counters re-seeded from the true start.
+        """
+        q = torch.as_tensor(np.asarray(qpos_rows), dtype=torch.float32,
+                            device=self.device)
+        assert q.shape == (self.nworld, int(self.mjm.nq)), q.shape
+        mask = torch.ones(self.nworld, dtype=torch.bool, device=self.device)
+        with self._warp_stream():
+            self._qpos.copy_(q)
+            self._qvel.zero_()
+            self._act.zero_()
+            self.ctrl.zero_()
+            self._time.zero_()
+            self._overflow.zero_()
+            self._mjw.forward(self.m, self.d)
+            self.reward.reset(mask, self._sensordata)
+            self.tracker.reset(mask)
+            self.episode_step.zero_()
+            obs = observe(self.layout, self._sensordata)
+        self._release_stream()
+        return obs
+
     def step(self, action: torch.Tensor):
         """One 20 ms body step -> (obs, reward, done, info).
 
