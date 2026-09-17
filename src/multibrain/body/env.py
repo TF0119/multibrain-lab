@@ -75,6 +75,11 @@ class WarpBodyEnv:
         term = task_y["termination"]
         self._max_pelvis_xy = float(term["max_pelvis_xy_m"])
         self._on_nonfinite = bool(term["on_nonfinite"])
+        # per-task: end the trial once the pelvis drops below this fraction
+        # of the reference standing height (0 = never, the default for
+        # rise_and_stand, where getting up from the floor is the task)
+        self._fall_ratio = float(spec.get("terminate_on_fall_ratio", 0.0)) \
+            if spec.get("terminate_on_fall", False) else 0.0
 
         self.mjm = mujoco.MjModel.from_xml_path(str(xml_path))
         mjd0 = mujoco.MjData(self.mjm)
@@ -241,7 +246,9 @@ class WarpBodyEnv:
         tanh(mu)) and is what the action-rate (操作の急変) term measures;
         it defaults to the executed action. done =
         episode_steps reached | pelvis xy out of bounds | non-finite state
-        (when termination.on_nonfinite). Worlds marked done keep stepping
+        (when termination.on_nonfinite) — and, for a task with
+        terminate_on_fall, once the pelvis falls below
+        terminate_on_fall_ratio * h_ref. Worlds marked done keep stepping
         until the caller resets them — PPO consumes info["time_out"] for
         bootstrapping. Nothing here syncs the host.
         """
@@ -269,7 +276,11 @@ class WarpBodyEnv:
                              >= self._max_pelvis_xy)
             nonfinite = ~(torch.isfinite(self._qpos).all(dim=-1)
                           & torch.isfinite(self._qvel).all(dim=-1))
-            done = time_out | out_of_bounds
+            fallen = (s[:, self.layout.framepos_idx[2]]
+                      < self._fall_ratio * float(self.layout.h_ref)
+                      if self._fall_ratio > 0.0
+                      else torch.zeros_like(time_out))
+            done = time_out | out_of_bounds | fallen
             if self._on_nonfinite:
                 done = done | nonfinite
             info = {
@@ -280,6 +291,7 @@ class WarpBodyEnv:
                 "nonfinite": nonfinite,
                 "time_out": time_out,
                 "out_of_bounds": out_of_bounds,
+                "fallen": fallen,
                 "overflow": self._overflow != 0,
             }
 

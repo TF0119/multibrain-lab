@@ -10,7 +10,10 @@ tasks:
   stand_balance:
     episode_s: 60
     starts: [standing]
-    terminate_on_fall: false
+    terminate_on_fall: true          # 立位維持の課題なので転倒で終了する。
+    terminate_on_fall_ratio: 0.5     # 骨盤高が基準立位の 50% を切ったら転倒。
+                                     # 終了しない設定だと、倒れた後の 59 秒を
+                                     # 臥位で過ごし信号が 1/60 に薄まる（実測）
 
 termination:
   max_pelvis_xy_m: 3.0        # 場外

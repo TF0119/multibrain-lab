@@ -150,3 +150,32 @@ def test_eval_starts(layout):
     for (k1, q1), (k2, q2) in zip(starts, again):
         assert k1 == k2
         np.testing.assert_array_equal(q1, q2)
+
+
+def test_stand_balance_terminates_on_fall():
+    """stand_balance ends a trial once the pelvis drops below half the
+    reference height; rise_and_stand never does (getting up is the task)."""
+    e = WarpBodyEnv(nworld=4, task="stand_balance", seed=3)
+    try:
+        e.reset()
+        fell = torch.zeros(4, dtype=torch.bool, device="cuda")
+        for _ in range(150):  # 3 s of zero torque from standing
+            _, _, done, info = e.step(torch.zeros(4, e.act_dim, device="cuda"))
+            fell |= info["fallen"]
+            if bool(done.any()):
+                assert bool((info["fallen"] | info["time_out"]
+                             | info["out_of_bounds"] | info["nonfinite"])
+                            [done].all())
+                e.reset(done)
+        assert bool(fell.any()), "zero torque from standing must fall"
+    finally:
+        e.close()
+
+    e2 = WarpBodyEnv(nworld=4, task="rise_and_stand", seed=3)
+    try:
+        e2.reset()
+        for _ in range(50):
+            _, _, _, info = e2.step(torch.zeros(4, e2.act_dim, device="cuda"))
+            assert not bool(info["fallen"].any())
+    finally:
+        e2.close()
