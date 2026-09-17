@@ -114,17 +114,22 @@ class BrainCore(nn.Module):
         u.index_add_(2, self.ports.in_neuron, phi)
         return u.permute(2, 0, 1).reshape(self.N, K * B)
 
-    def readout(self, s: Tensor) -> Tensor:
-        """s: (N, K·B) → 正規化トルク a: (K, B, J)。"""
+    def readout_pre(self, s: Tensor) -> Tensor:
+        """s: (N, K·B) → tanh を通す前の読出し値 (K, B, J)。"""
         K = self.K
         r = s.view(self.N, K, -1)[self.ports.out_neuron]                         # (Q, K, B)
         contrib = r * self.out_w.t().unsqueeze(2)                                # (Q, K, B)
         out = torch.zeros(len(self.ports.joints), K, r.shape[2], device=s.device)
         out.index_add_(0, self.ports.out_row, contrib)
-        return torch.tanh(out.permute(1, 2, 0))
+        return out.permute(1, 2, 0)
 
-    def forward(self, state, obs: Tensor, m: Tensor | None = None):
-        """1 更新。state = (v, I, s)、obs: (K, B, S)、m: 合成シナプス電流 (N, K·B) または None。"""
+    def readout(self, s: Tensor) -> Tensor:
+        """s: (N, K·B) → 正規化トルク a: (K, B, J)。"""
+        return torch.tanh(self.readout_pre(s))
+
+    def forward(self, state, obs: Tensor, m: Tensor | None = None, pre_tanh: bool = False):
+        """1 更新。state = (v, I, s)、obs: (K, B, S)、m: 合成シナプス電流 (N, K·B) または None。
+        pre_tanh=True のとき第 2 返り値は tanh 前の読出し値（§4.4 のガウス分布の平均）。"""
         v, I, s = state
         p = self.params()
         K, B = obs.shape[:2]
@@ -139,7 +144,8 @@ class BrainCore(nn.Module):
         s = torch.sigmoid((v - 1.0) / BETA)
         flat = lambda x: x.reshape(self.N, K * B)
         s = flat(s)
-        return (flat(v), flat(I), s), self.readout(s)
+        out = self.readout_pre(s) if pre_tanh else self.readout(s)
+        return (flat(v), flat(I), s), out
 
 
 def spectral_radius(w0: Tensor, iters: int = 100) -> float:
