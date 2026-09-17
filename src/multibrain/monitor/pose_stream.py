@@ -361,6 +361,8 @@ class PoseStreamer:
             while True:
                 await ready.wait()
                 ready.clear()
+                if not self.enabled:
+                    break
                 for kind in ("pose", "activity"):
                     frame = state[kind]
                     if frame is None:
@@ -441,6 +443,11 @@ class PoseStreamer:
         self._loop.create_task(self._shutdown_async())
 
     async def _shutdown_async(self):
+        # wake every handler blocked in ready.wait() so it can observe the
+        # closed socket and finish; otherwise wait_closed() times out and
+        # the interpreter reports destroyed pending tasks at exit
+        for _state, ready in list(self._clients.values()):
+            ready.set()
         for ws in list(self._clients):
             try:
                 await asyncio.wait_for(ws.close(), 1.0)
