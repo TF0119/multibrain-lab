@@ -66,6 +66,9 @@ export class ActivityHud {
     this.frame = null;
     this.dirty = false;
     this.visible = false;
+    // 目盛り: 'auto' はフレームの最大値を 1 とし最大値を数字で示す（乱数観測では
+    // 平均活動が 0.02 程度で、絶対目盛りだとバーも点群も空に見えるため）。
+    this.scaleMode = 'auto';
     this.W = 328;
     this.labelW = 116;
     this.rowH = Math.max(10, 4 + this.K * 4);
@@ -94,9 +97,33 @@ export class ActivityHud {
     return [c, ctx];
   }
 
+  setScaleMode(mode) {
+    this.scaleMode = mode === 'abs' ? 'abs' : 'auto';
+    for (const b of this.scaleBtns) {
+      b.classList.toggle('on', b.dataset.scale === this.scaleMode);
+    }
+    this.dirty = true;
+  }
+
   _build() {
-    // 枠1: 群ごとの活動バー
+    // 枠1: 群ごとの活動バー（目盛りの切替ボタンつき）
     const s1 = this._sec('群の活動');
+    const bar = document.createElement('div');
+    bar.className = 'act-scale';
+    this.scaleBtns = [];
+    for (const [mode, label] of [['auto', '自動'], ['abs', '絶対']]) {
+      const b = document.createElement('button');
+      b.dataset.scale = mode;
+      b.textContent = label;
+      b.classList.toggle('on', mode === this.scaleMode);
+      b.addEventListener('click', () => this.setScaleMode(mode));
+      bar.appendChild(b);
+      this.scaleBtns.push(b);
+    }
+    this.scaleNote = document.createElement('span');
+    this.scaleNote.className = 'act-note';
+    bar.appendChild(this.scaleNote);
+    s1.appendChild(bar);
     const legend = document.createElement('div');
     legend.className = 'act-legend';
     (this.meta.brains ?? []).forEach((b, k) => {
@@ -119,6 +146,9 @@ export class ActivityHud {
 
     // 枠3: 標本の点群（脳ごとに一枚）
     const s3 = this._sec('標本の活動');
+    this.cloudNote = document.createElement('div');
+    this.cloudNote.className = 'act-note';
+    s3.appendChild(this.cloudNote);
     const row = document.createElement('div');
     row.className = 'act-clouds';
     this.clouds = [];
@@ -179,6 +209,15 @@ export class ActivityHud {
     ctx.textBaseline = 'middle';
     const gMax = Math.min(f.G, this.G), kMax = Math.min(f.K, this.K);
     const bh = (this.rowH - 6) / kMax;
+    let top = 0;
+    for (let k = 0; k < kMax; k++) {
+      for (let g = 0; g < gMax; g++) top = Math.max(top, f.stats[(k * f.G + g) * 2]);
+    }
+    const auto = this.scaleMode === 'auto' && top > 0;
+    const unit = auto ? top : 1;
+    this.scaleNote.textContent = auto
+      ? `平均の最大 ${top.toFixed(4)} を 1 とする（目盛りは活動率）`
+      : '0〜1 の絶対目盛り';
     for (let g = 0; g < gMax; g++) {
       const y = g * this.rowH;
       const grp = this.meta.groups[g];
@@ -192,7 +231,7 @@ export class ActivityHud {
         const rate = f.stats[(k * f.G + g) * 2 + 1];
         ctx.fillStyle = this.colors[k];
         ctx.fillRect(barX, y + 3 + k * bh,
-          clamp01(mean) * barW, Math.max(1, bh - 1));
+          clamp01(mean / unit) * barW, Math.max(1, bh - 1));
         ctx.fillStyle = '#e8eef3';
         ctx.fillRect(barX + clamp01(rate) * barW - 0.5,
           y + 3 + k * bh, 1, Math.max(1, bh - 1));
@@ -208,6 +247,7 @@ export class ActivityHud {
     ctx.font = '9px ui-monospace, monospace';
     ctx.textBaseline = 'middle';
     const kMax = Math.min(this.frame.K, this.K);
+    const autoMode = this.scaleMode === 'auto';
     for (let g = 0; g < this.G; g++) {
       const y = g * this.sparkRowH, h = this.sparkRowH;
       const grp = this.meta.groups[g];
@@ -215,13 +255,31 @@ export class ActivityHud {
       ctx.fillText(`${grp.label ?? grp.id}`, 0, y + h / 2, this.labelW - 6);
       ctx.strokeStyle = '#2a333d';
       ctx.strokeRect(lineX + 0.5, y + 1.5, lineW - 1, h - 3);
+      // 自動目盛り: この行（全脳）の直近ウィンドウの最大値を 1 とする
+      let rowMax = 0;
+      if (autoMode) {
+        for (let k = 0; k < kMax; k++) {
+          const base = (k * this.G + g) * this.win;
+          for (let i = 0; i < this.count; i++) {
+            const idx = (this.head - this.count + i + this.win) % this.win;
+            rowMax = Math.max(rowMax, this.hist[base + idx]);
+          }
+        }
+      }
+      const unit = autoMode && rowMax > 0 ? rowMax : 1;
+      if (autoMode && rowMax > 0) {
+        ctx.fillStyle = '#6f7b86';
+        ctx.textAlign = 'right';
+        ctx.fillText(rowMax.toFixed(3), lineX + lineW - 3, y + h / 2);
+        ctx.textAlign = 'left';
+      }
       for (let k = 0; k < kMax; k++) {
         ctx.strokeStyle = this.colors[k];
         ctx.beginPath();
         const base = (k * this.G + g) * this.win;
         for (let i = 0; i < this.count; i++) {
           const idx = (this.head - this.count + i + this.win) % this.win;
-          const v = clamp01(this.hist[base + idx]);
+          const v = clamp01(this.hist[base + idx] / unit);
           const x = lineX + (i / (this.win - 1)) * (lineW - 2) + 1;
           const py = y + h - 2 - v * (h - 4);
           if (i === 0) ctx.moveTo(x, py); else ctx.lineTo(x, py);
@@ -237,6 +295,13 @@ export class ActivityHud {
     if (!pos) return;
     const f = this.frame;
     const mMax = Math.min(f.M, this.M, pos.length);
+    let top = 0;
+    for (let i = 0; i < f.sample.length; i++) top = Math.max(top, f.sample[i]);
+    const auto = this.scaleMode === 'auto' && top > 0;
+    const gain = auto ? 255 / top : 1;
+    this.cloudNote.textContent = auto
+      ? `標本の最大 ${top}/255 を最も明るい色とする`
+      : '0〜255 の絶対目盛り';
     for (let k = 0; k < Math.min(f.K, this.K); k++) {
       const { ctx, size } = this.clouds[k];
       ctx.clearRect(0, 0, size, size);
@@ -245,7 +310,7 @@ export class ActivityHud {
       for (let m = 0; m < mMax; m++) {
         const px = (clamp01(pos[m][0] * 0.5 + 0.5)) * (size - 4) + 2;
         const py = (1 - clamp01(pos[m][2] * 0.5 + 0.5)) * (size - 4) + 2;
-        ctx.fillStyle = HEAT[f.sample[k * f.M + m]];
+        ctx.fillStyle = HEAT[Math.min(255, Math.round(f.sample[k * f.M + m] * gain))];
         ctx.fillRect(px - 1, py - 1, 2.5, 2.5);
       }
     }

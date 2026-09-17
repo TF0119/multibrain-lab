@@ -72,3 +72,10 @@ canvas { display: block; }
 .act-clouds { display: flex; gap: 6px; }
 .act-cloud { flex: 1; min-width: 0; }
 .act-cap { text-align: center; opacity: 0.85; font-size: 10px; }
+.act-scale { display: flex; gap: 4px; align-items: center; margin-bottom: 4px; }
+.act-scale button {
+  background: #1d242c; color: #cfd6dd; border: 1px solid #3a4652;
+  border-radius: 3px; padding: 1px 8px; font: inherit; font-size: 10px; cursor: pointer;
+}
+.act-scale button.on { border-color: #8fd3ff; color: #8fd3ff; }
+.act-note { font-size: 10px; opacity: 0.75; margin-left: 4px; }
