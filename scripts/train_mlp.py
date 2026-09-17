@@ -52,6 +52,12 @@ def parse_args():
     ap.add_argument("--max-compute-hours", type=float, default=None,
                     help="optional wall-clock cap (§10.3)")
     ap.add_argument("--collect-len", type=int, default=64)
+    ap.add_argument("--lr", type=float, default=None,
+                    help="Adam learning rate (default: PPOConfig, 3e-4)")
+    ap.add_argument("--entropy-coef", type=float, default=None,
+                    help="entropy bonus coefficient (default: 0)")
+    ap.add_argument("--reward-cfg", default=None,
+                    help="alternative reward yaml (default configs/reward.yaml)")
     ap.add_argument("--no-play-after", action="store_true",
                     help="with --stream: exit when done instead of replaying "
                          "the final policy for the viewer")
@@ -129,9 +135,19 @@ def main():
             raise SystemExit("streamer failed to start")
         print(f"[stream] ws://{args.host}:{streamer.port}")
 
+    env_kw = {}
+    if args.reward_cfg:
+        env_kw["reward_cfg"] = args.reward_cfg
     env = WarpBodyEnv(nworld=args.nworld, task=args.task,
-                      seed=args.seed, streamer=streamer)
-    ppo = PPO(env, cfg=PPOConfig(collect_len=args.collect_len))
+                      seed=args.seed, streamer=streamer, **env_kw)
+    cfg_kw = {"collect_len": args.collect_len}
+    if args.lr is not None:
+        cfg_kw["lr"] = args.lr
+    if args.entropy_coef is not None:
+        cfg_kw["entropy_coef"] = args.entropy_coef
+    ppo = PPO(env, cfg=PPOConfig(**cfg_kw))
+    print(f"[config] {ppo.cfg} reward_cfg={args.reward_cfg or 'configs/reward.yaml'}",
+          flush=True)
 
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -142,7 +158,7 @@ def main():
     starts = None
     if args.eval_every and args.eval_every > 0:
         eval_env = WarpBodyEnv(nworld=EVAL_N, task=args.task,
-                               seed=args.seed + 1000)
+                               seed=args.seed + 1000, **env_kw)
         starts = eval_starts(
             BodyLayout.from_model(eval_env.mjm), n=EVAL_N, seed=EVAL_SEED,
             mjm=eval_env.mjm)
