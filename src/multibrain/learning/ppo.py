@@ -127,10 +127,12 @@ class PPO:
             nobs = self.norm.normalize(obs)
             act_prev = self._applied_torque()
             with torch.no_grad():
-                u, a, logp = self.policy.act(nobs)
+                u, a, logp, cmd = self.policy.act_with_mean(nobs)
                 v = self.value(nobs, act_prev)
 
-            obs2, rew, done, info = env.step(a)
+            # the smoothness term sees the deterministic command tanh(mu),
+            # not the exploration noise (see GaussianMlpPolicy.act_with_mean)
+            obs2, rew, done, info = env.step(a, command=cmd)
             nobs2 = self.norm.normalize(obs2)
             with torch.no_grad():
                 v2 = self.value(nobs2, self._applied_torque())

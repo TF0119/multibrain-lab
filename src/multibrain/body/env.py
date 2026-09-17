@@ -187,7 +187,7 @@ class WarpBodyEnv:
                                           size=idx.numel())
                 qpos = np.stack([
                     start_qpos(self._layout_host, self._starts[int(k)],
-                               self.rng)
+                               self.rng, self.mjm)
                     for k in kinds])
                 qpos_t = torch.as_tensor(qpos, dtype=torch.float32,
                                          device=self.device)
@@ -233,10 +233,13 @@ class WarpBodyEnv:
         self._release_stream()
         return obs
 
-    def step(self, action: torch.Tensor):
+    def step(self, action: torch.Tensor, command: torch.Tensor | None = None):
         """One 20 ms body step -> (obs, reward, done, info).
 
-        `action` (nworld, act_dim) is clamped to [-1, 1] into ctrl. done =
+        `action` (nworld, act_dim) is clamped to [-1, 1] into ctrl.
+        `command`, when given, is the policy's deterministic command (e.g.
+        tanh(mu)) and is what the action-rate (操作の急変) term measures;
+        it defaults to the executed action. done =
         episode_steps reached | pelvis xy out of bounds | non-finite state
         (when termination.on_nonfinite). Worlds marked done keep stepping
         until the caller resets them — PPO consumes info["time_out"] for
@@ -255,7 +258,9 @@ class WarpBodyEnv:
             standing = standing_now(self.layout, self.success_cfg, s)
             tr = self.tracker.update(standing)
             total, terms = self.reward.step(
-                s, self._act, self.ctrl, standing, tr["first_success"])
+                s, self._act,
+                self.ctrl if command is None else command.clamp(-1.0, 1.0),
+                standing, tr["first_success"])
 
             self.episode_step += 1
             self._body_steps += 1

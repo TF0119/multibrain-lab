@@ -60,6 +60,16 @@ class GaussianMlpPolicy(nn.Module):
         u = d.sample()
         return u, torch.tanh(u), d.log_prob(u).sum(-1)
 
+    def act_with_mean(self, obs: torch.Tensor):
+        """Sample -> (u, a = tanh(u), logp(u), tanh(mu)).
+
+        tanh(mu) is the deterministic command the smoothness penalty is
+        measured on: penalizing the sampled a would charge the exploration
+        noise itself and drive the policy std to zero."""
+        d = self.dist(obs)
+        u = d.sample()
+        return u, torch.tanh(u), d.log_prob(u).sum(-1), torch.tanh(d.mean)
+
     def log_prob(self, obs: torch.Tensor, u: torch.Tensor) -> torch.Tensor:
         """(B,) log probability of pre-tanh action u under the policy."""
         return self.dist(obs).log_prob(u).sum(-1)

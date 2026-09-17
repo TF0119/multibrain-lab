@@ -2,8 +2,12 @@
 
 Base orientations and pelvis heights come from scripts/check_body.py POSES
 (supine = -90 deg pitch about +y, prone = +90 deg, side = +90 deg roll
-about +x). Every start adds a uniform yaw U(-pi, pi); lying starts scatter
-each joint around the middle of its range by +/-20% of the half-range.
+about +x). Every start adds a uniform yaw U(-pi, pi); lying starts jitter
+each joint around the rest (extended) pose by +/-LYING_JOINT_JITTER so
+the limbs stay roughly in the body plane. Scattering around the middle
+of the ranges (bent knees and elbows) made limbs point out of that plane
+and, once the height is settled on the lowest point, lifted the pelvis
+to 0.5 m and dropped the body from there.
 
 `standing` keeps the rest joints plus a small jitter (joints +/-2 deg,
 pelvis tilt up to 2 deg about a random horizontal axis): the exactly
@@ -13,10 +17,16 @@ rest height plus U(0, 0.02 m).
 
 `layout` may be the numpy BodyLayout (BodyLayout.from_model) or a device
 copy (.to(device)); the arrays used here are read back as numpy.
+
+When the CPU model `mjm` is given, the pelvis height is settled so that the
+lowest point of any body geom sits CLEARANCE above the floor: the scattered
+joints otherwise push hands and feet up to 0.4 m below the floor, and the
+penetration recovery launches the body metres into the air.
 """
 
 import math
 
+import mujoco
 import numpy as np
 
 # (w, x, y, z) pelvis quats and pelvis heights, same values as
@@ -31,12 +41,45 @@ POSES = {
              0.20),
 }
 
-LYING_JOINT_SCATTER = 0.20            # fraction of the half-range
+LYING_JOINT_JITTER = math.radians(15.0)   # around the rest pose
 STANDING_JOINT_JITTER = math.radians(2.0)
 STANDING_TILT_MAX = math.radians(2.0)
 STANDING_HEIGHT_JITTER = 0.02         # m, added to the rest pelvis height
 
 EVAL_KINDS = ("supine", "prone", "side")
+CLEARANCE = 0.005                     # m, lowest geom point above the floor
+
+
+def lowest_geom_z(mjm, d) -> float:
+    """Exact lowest world-z of all body geoms (floor plane excluded)."""
+    lo = math.inf
+    for g in range(mjm.ngeom):
+        if mjm.geom_bodyid[g] == 0:
+            continue
+        t = int(mjm.geom_type[g])
+        c = d.geom_xpos[g]
+        R = d.geom_xmat[g].reshape(3, 3)
+        size = mjm.geom_size[g]
+        if t == int(mujoco.mjtGeom.mjGEOM_SPHERE):
+            z = c[2] - size[0]
+        elif t in (int(mujoco.mjtGeom.mjGEOM_CAPSULE),
+                   int(mujoco.mjtGeom.mjGEOM_CYLINDER)):
+            axis_z = R[2, 2] * size[1]
+            z = min(c[2] - axis_z, c[2] + axis_z) - size[0]
+        else:  # box (and anything else): rotated half extents
+            z = c[2] - float(np.abs(R[2]) @ size)
+        lo = min(lo, float(z))
+    return lo
+
+
+def settle_height(mjm, qpos: np.ndarray, clearance: float = CLEARANCE):
+    """Return qpos with qpos[2] shifted so lowest_geom_z == clearance."""
+    d = mujoco.MjData(mjm)
+    d.qpos[:] = qpos
+    mujoco.mj_kinematics(mjm, d)
+    out = np.array(qpos, dtype=np.float64)
+    out[2] += clearance - lowest_geom_z(mjm, d)
+    return out
 
 
 def _np(x) -> np.ndarray:
@@ -69,10 +112,13 @@ def _axis_angle(axis, ang):
     return (math.cos(ang / 2.0), axis[0] * s, axis[1] * s, axis[2] * s)
 
 
-def start_qpos(layout, kind: str, rng: np.random.Generator) -> np.ndarray:
+def start_qpos(layout, kind: str, rng: np.random.Generator,
+               mjm=None) -> np.ndarray:
     """(nq,) qpos for one trial starting in `kind` pose.
 
-    kind is one of "standing", "supine", "prone", "side".
+    kind is one of "standing", "supine", "prone", "side". With `mjm` the
+    pelvis height is settled on the lowest geom point (see module doc);
+    without it the nominal POSES height is used as-is.
     """
     base_quat, z = POSES[kind]
 
@@ -97,17 +143,18 @@ def start_qpos(layout, kind: str, rng: np.random.Generator) -> np.ndarray:
                         size=lo.shape[0]),
             lo, hi)
     else:
-        mid = 0.5 * (lo + hi)
-        half = 0.5 * (hi - lo)
-        joints = mid + rng.uniform(
-            -LYING_JOINT_SCATTER, LYING_JOINT_SCATTER,
-            size=lo.shape[0]) * half
+        joints = np.clip(
+            rng.uniform(-LYING_JOINT_JITTER, LYING_JOINT_JITTER,
+                        size=lo.shape[0]),
+            lo, hi)
     qpos[3:7] = quat
     qpos[adr] = joints
+    if mjm is not None:
+        qpos = settle_height(mjm, qpos)
     return qpos.astype(np.float32)
 
 
-def eval_starts(layout, n: int = 24, seed: int = 12345):
+def eval_starts(layout, n: int = 24, seed: int = 12345, mjm=None):
     """Fixed evaluation starts: supine / prone / side, n/3 of each.
 
     Fixed seed — these are the §5.2 evaluation conditions and must not
@@ -118,5 +165,5 @@ def eval_starts(layout, n: int = 24, seed: int = 12345):
     out = []
     for kind in EVAL_KINDS:
         for _ in range(per):
-            out.append((kind, start_qpos(layout, kind, rng)))
+            out.append((kind, start_qpos(layout, kind, rng, mjm)))
     return out
