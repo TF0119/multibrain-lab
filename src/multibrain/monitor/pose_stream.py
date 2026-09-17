@@ -28,7 +28,11 @@ streamer disables itself and ``submit()`` becomes a no-op.
 ``WarpPoseSource`` feeds env-0 qpos from a mujoco_warp simulation without
 synchronizing the caller: each ``enqueue()`` issues a device->device copy
 plus a device->pinned-host copy and records a CUDA event; ``read()`` only
-checks the event and returns the last completed copy (or None -> drop).
+checks the event and returns the completed copy once (or None -> not yet).
+Loop order per body step: ``read()`` the previous step's copy and submit
+it, then ``enqueue()`` the current one. Reading right after enqueueing in
+the same step almost always finds the event still pending (the GPU is
+busy with that very step), so nearly every frame would be dropped.
 """
 
 import asyncio
@@ -434,25 +438,32 @@ class PoseStreamer:
             self._thread.join(timeout=3.0)
 
     def _shutdown(self):
+        self._loop.create_task(self._shutdown_async())
+
+    async def _shutdown_async(self):
         for ws in list(self._clients):
             try:
-                self._loop.create_task(ws.close())
+                await asyncio.wait_for(ws.close(), 1.0)
             except Exception:
                 pass
         if self._server is not None:
             self._server.close()
-        self._loop.call_later(0.3, self._loop.stop)
+            try:
+                await asyncio.wait_for(self._server.wait_closed(), 1.0)
+            except Exception:
+                pass
+        self._loop.stop()
 
 
 class WarpPoseSource:
     """Non-blocking env-`env` qpos readout from a mujoco_warp sim.
 
-    Call ``enqueue()`` once per body step on the caller's stream: it issues
-    a device->device copy plus a device->pinned-host copy and records a CUDA
-    event — all async, the caller never waits on the GPU. ``read()`` checks
-    the recorded event with ``query()`` (no sync) and returns the last
-    completed host copy, or None when the copy hasn't landed yet so the
-    caller can drop the frame.
+    Call ``read()`` first and ``enqueue()`` last in each body step. enqueue
+    issues a device->device copy plus a device->pinned-host copy and records
+    a CUDA event — all async, the caller never waits on the GPU. read checks
+    the recorded event with ``query()`` (no sync) and returns the completed
+    host copy once, or None when the copy hasn't landed yet so the caller
+    can drop the frame.
     """
 
     def __init__(self, d, nq, env=0):
@@ -475,4 +486,5 @@ class WarpPoseSource:
     def read(self):
         if not self._armed or not self._event.query():
             return None
+        self._armed = False
         return self._host.numpy().copy()

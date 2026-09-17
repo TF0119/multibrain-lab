@@ -278,14 +278,14 @@ class WarpBodyEnv:
                 "overflow": self._overflow != 0,
             }
 
-            # env-0 pose for the viewer: non-blocking staged copy, the
-            # previously completed frame is what actually gets submitted
+            # env-0 pose for the viewer: submit the previous step's staged
+            # copy if it has landed, then stage this step's (never wait)
             if self._pose_src is not None:
-                self._pose_src.enqueue()
                 q = self._pose_src.read()
                 if q is not None:
                     self._streamer.submit(
-                        self._body_steps * self.body_step_s, q)
+                        (self._body_steps - 1) * self.body_step_s, q)
+                self._pose_src.enqueue()
         self._release_stream()
         return obs, total, done, info
 

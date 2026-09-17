@@ -190,10 +190,10 @@ def run_warp(mjm, args, streamer, act=None):
                 (0.6 * np.sin(2 * np.pi * 0.4 * t + phase)).astype(np.float32))
         for _ in range(SUBSTEPS):
             mujoco_warp.step(m, d)
-        src.enqueue()
-        q = src.read()
+        q = src.read()                 # previous step's copy, if landed
         if q is not None:
-            streamer.submit(t, q)
+            streamer.submit(t - SUBSTEPS * mjm.opt.timestep, q)
+        src.enqueue()
         if act is not None:
             obs = torch.rand(core.K, args.nworld, N_OBS,
                              device=core.w0.device) * 2 - 1
