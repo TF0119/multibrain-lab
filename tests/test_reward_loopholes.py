@@ -106,14 +106,19 @@ def test_jump_synthetic_height_telescopes(layout, rcfg):
     reward.reset(torch.ones(1, dtype=torch.bool), lo)
     zeros = torch.zeros(1, layout.nu)
     f = torch.zeros(1, dtype=torch.bool)
-    hp = tot = 0.0
+    hp = tot = dense = 0.0
     for _ in range(20):
         for s in (hi, lo):
             total, terms = reward.step(s, zeros, zeros, f, f)
             hp += float(terms["height_progress"])
+            dense += float(terms["height"])
             tot += float(total)
     assert abs(hp) < 1e-5
-    assert tot <= 1e-6
+    # the only thing bobbing earns is the dense height term, i.e. exactly
+    # what resting at the mean height (0.4 m) would earn
+    assert tot == pytest.approx(dense, abs=1e-5)
+    assert dense == pytest.approx(
+        40 * rcfg.coef["height"] * 0.4 / rcfg.h_ref, abs=1e-4)
 
 
 def test_hopping_pays_less_than_standing(mjm, layout, rcfg, scfg):
@@ -180,7 +185,8 @@ def test_kneeling_pays_less_than_standing(mjm, layout, rcfg, scfg):
 def test_propped_pelvis_pays_less_than_standing(layout, rcfg):
     """Synthetic: pelvis at 0.85 h_ref propped on both hands (torso z axis
     tilted to cos 0.7), feet loaded too. Per step: uprightness 0.2 * 0.7
-    minus extra contact 0.05 * 2 hands = 0.04, versus 1.2 for standing."""
+    plus dense height 0.05 * 0.85 minus extra contact 0.05 * 2 hands
+    = 0.0825, versus ~1.25 for standing."""
     s = _synthetic(layout, framepos_imu=[0.0, 0.0, 0.85 * rcfg.h_ref],
                    framezaxis_torso=[0.0, math.sqrt(1 - 0.7 ** 2), 0.7],
                    touch_hand_L=30.0, touch_hand_R=30.0,
@@ -191,6 +197,7 @@ def test_propped_pelvis_pays_less_than_standing(layout, rcfg):
     f = torch.zeros(1, dtype=torch.bool)
     total, terms = reward.step(s, zeros, zeros, f, f)
     expected = (rcfg.coef["uprightness"] * 0.7
+                + rcfg.coef["height"] * 0.85
                 - rcfg.coef["extra_contact"] * 2)
     assert float(total) == pytest.approx(expected, abs=1e-6)
     assert float(terms["extra_contact"]) == pytest.approx(

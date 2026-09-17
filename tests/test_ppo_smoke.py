@@ -47,7 +47,7 @@ def test_one_update(env):
                 "gpu_mem_reserved_mb"):
         assert key in stats
         assert math.isfinite(stats[key]), key
-    assert len(stats["terms"]) == 9
+    assert len(stats["terms"]) == 10
     assert all(math.isfinite(v) for v in stats["terms"].values())
     changed = [not torch.equal(b, p.detach())
                for b, p in zip(before, ppo.policy.parameters())]

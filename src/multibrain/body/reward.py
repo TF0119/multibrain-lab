@@ -1,9 +1,10 @@
 """Reward of PLAN.md §5.3 on a batch of sensordata tensors (B envs, torch).
 
 All coefficients and thresholds come from configs/reward.yaml (via
-RewardConfig); nothing is hard-coded. The nine terms are:
+RewardConfig); nothing is hard-coded. The ten terms are:
 
   height_progress      c * (h_t - h_{t-1}) / h_ref
+  height               c * h_t / h_ref            (dense; gradient at every height)
   uprightness          c * clamp(cos tilt, -1, 1) * 1[h_t >= 0.5 h_ref]
   standing             c * 1[standing]
   first_success        c * 1[first_success]
@@ -28,7 +29,7 @@ from .layout import BodyLayout
 from .observation import _idx, _val
 from .success import tilt_cos
 
-TERMS = ["height_progress", "uprightness", "standing", "first_success",
+TERMS = ["height_progress", "height", "uprightness", "standing", "first_success",
          "pain_impact", "pain_joint_limit", "fatigue_energy",
          "fatigue_action_rate", "extra_contact"]
 
@@ -138,6 +139,7 @@ class Reward:
         terms = {}
         terms["height_progress"] = (
             cfg.coef["height_progress"] * (h_t - self.h_prev) / cfg.h_ref)
+        terms["height"] = cfg.coef["height"] * h_t / cfg.h_ref
         terms["uprightness"] = (
             cfg.coef["uprightness"] * tilt
             * (h_t >= cfg.uprightness_min_height_ratio

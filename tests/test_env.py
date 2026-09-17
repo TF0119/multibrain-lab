@@ -95,7 +95,7 @@ def test_random_rollout_100_steps(env):
         assert torch.isfinite(reward).all()
     assert reward.shape == (NWORLD,)
     assert set(info["terms"].keys()) == set(TERMS)
-    assert len(info["terms"]) == 9
+    assert len(info["terms"]) == 10
     assert not info["nonfinite"].any()
     assert not info["overflow"].any()
 

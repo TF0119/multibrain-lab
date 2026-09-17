@@ -5,6 +5,7 @@ h_ref: 0.84
 
 coef:
   height_progress: 2.0        # (h_t - h_{t-1}) / h_ref
+  height: 0.05                # h_t / h_ref（密な高さ。中間の高さにも勾配を与える）
   uprightness: 0.2            # cos θ_t · 1[h_t ≥ uprightness.min_height_ratio · h_ref]
   standing: 1.0               # 成功条件（§5.2）を満たすステップごとに 1
   first_success: 10.0         # 連続 10 秒を初めて満たしたとき一回

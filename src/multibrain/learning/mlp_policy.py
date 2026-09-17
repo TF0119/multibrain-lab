@@ -20,6 +20,8 @@ OBS_DIM = 76
 ACT_DIM = 27
 HIDDEN = (256, 256)
 LOG_STD0 = math.log(0.3)
+LOG_STD_MIN = math.log(0.1)   # exploration floor (§7): penalties on noise
+                              # torques otherwise drive std -> 0 while lying
 
 
 def _mlp(in_dim: int, hidden, out_dim: int) -> nn.Sequential:
@@ -52,7 +54,8 @@ class GaussianMlpPolicy(nn.Module):
 
     def dist(self, obs: torch.Tensor) -> Normal:
         mu = self.net(obs)
-        return Normal(mu, self.log_std.exp().expand_as(mu))
+        std = self.log_std.clamp(min=LOG_STD_MIN).exp()
+        return Normal(mu, std.expand_as(mu))
 
     def act(self, obs: torch.Tensor):
         """Sample -> (u, a = tanh(u), logp(u)). logp is over u, pre-tanh."""
