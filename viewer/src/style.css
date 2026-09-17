@@ -25,6 +25,9 @@ canvas { display: block; }
 #status.err { color: #ff9d8f; }
 #status.ok { color: #a7e8a0; }
 #info { white-space: pre; opacity: 0.85; }
+#train { white-space: pre; color: #ffd27f; }
+#train.replay { color: #a7e8a0; }
+#train.stale { color: #ff9d8f; }
 
 #controls { display: flex; gap: 4px; }
 #controls button {

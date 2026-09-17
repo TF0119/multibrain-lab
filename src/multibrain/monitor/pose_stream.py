@@ -352,7 +352,7 @@ class PoseStreamer:
 
     async def _handler(self, ws):
         # per client, per frame kind, keep only the newest frame
-        state = {"pose": None, "activity": None}
+        state = {"pose": None, "activity": None, "status": None}
         ready = asyncio.Event()
         self._clients[ws] = (state, ready)
         self._n_clients = len(self._clients)
@@ -363,14 +363,15 @@ class PoseStreamer:
                 ready.clear()
                 if not self.enabled:
                     break
-                for kind in ("pose", "activity"):
+                for kind in ("pose", "activity", "status"):
                     frame = state[kind]
                     if frame is None:
                         continue
                     state[kind] = None
                     await ws.send(frame)
-                    self.stats["sent" if kind == "pose"
-                               else "activity_sent"] += 1
+                    if kind != "status":
+                        self.stats["sent" if kind == "pose"
+                                   else "activity_sent"] += 1
         except Exception:
             pass
         finally:
@@ -419,6 +420,20 @@ class PoseStreamer:
         self.stats["activity_submitted"] += 1
         try:
             self._loop.call_soon_threadsafe(self._publish, "activity", frame)
+        except RuntimeError:
+            self.enabled = False
+            return False
+        return True
+
+    def submit_status(self, status: dict) -> bool:
+        """Offer a JSON status text message ({"type": "status", ...}):
+        training progress or replay info for the viewer's HUD. Latest-only
+        per client like the frames; the caller throttles (about 1 Hz)."""
+        if not self.enabled or self._n_clients == 0:
+            return False
+        msg = json.dumps({"type": "status", **status})
+        try:
+            self._loop.call_soon_threadsafe(self._publish, "status", msg)
         except RuntimeError:
             self.enabled = False
             return False

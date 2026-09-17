@@ -46,71 +46,47 @@ def main():
     from multibrain.body.env import WarpBodyEnv
     from multibrain.body.layout import BodyLayout
     from multibrain.body.start_poses import eval_starts
-    from multibrain.learning import PPO
+    from multibrain.learning import PPO, replay_episodes
 
     streamer = None
     if not args.no_stream:
         from multibrain.monitor import PoseStreamer, build_meta
         mjm = mujoco.MjModel.from_xml_path(str(XML_PATH))
-        streamer = PoseStreamer(build_meta(mjm, condition="mlp_control/play"),
-                                host=args.host, port=args.port).start()
+        meta = build_meta(mjm, condition="mlp_control")
+        meta["mode"] = "replay"
+        streamer = PoseStreamer(meta, host=args.host, port=args.port).start()
         print(f"[stream] ws://{args.host}:{streamer.port}", flush=True)
 
     env = WarpBodyEnv(nworld=args.nworld, task=args.task, seed=args.seed,
                       streamer=streamer)
     ppo = PPO.load(args.ckpt, env)
-    ppo.norm.freeze()
     layout = BodyLayout.from_model(env.mjm)
-    starts = eval_starts(layout, n=24)
-    starts = starts[args.world:] + starts[:args.world]
+    if args.random:
+        rng = np.random.default_rng(args.seed)
+        from multibrain.body.start_poses import start_qpos
+        kinds_all = ["supine", "prone", "side"]
+        starts = [(kinds_all[i % 3], start_qpos(layout, kinds_all[i % 3], rng, env.mjm))
+                  for i in range(env.nworld)]
+    else:
+        starts = eval_starts(layout, n=24, mjm=env.mjm)
+        starts = starts[args.world:] + starts[:args.world]
     dt = env.body_step_s
-    h_idx = layout.framepos_idx[2]
+
+    def on_episode(episode, rows):
+        print(json.dumps({"episode": episode, "episode_s": env.episode_steps * dt,
+                          "successes": sum(r["success"] for r in rows),
+                          "h_max_mean": round(sum(r["h_max"] for r in rows) / len(rows), 3),
+                          "h_final_mean": round(sum(r["h_final"] for r in rows) / len(rows), 3)}),
+              flush=True)
+        for row in rows:
+            print(json.dumps(row), flush=True)
+
     try:
-        while True:
-            if args.random:
-                obs = env.reset()
-                kinds = ["random"] * env.nworld
-            else:
-                rows = [q for _, q in starts[:env.nworld]]
-                while len(rows) < env.nworld:
-                    rows += rows[:env.nworld - len(rows)]
-                obs = env.reset_to(np.stack(rows))
-                kinds = [k for k, _ in starts[:env.nworld]]
-                kinds += kinds[:env.nworld - len(kinds)]
-            n = env.nworld
-            h_max = torch.zeros(n, device=env.device)
-            streak = torch.zeros(n, dtype=torch.long, device=env.device)
-            achieved = torch.zeros(n, dtype=torch.bool, device=env.device)
-            t0 = time.monotonic()
-            with torch.no_grad():
-                for i in range(env.episode_steps):
-                    a = ppo.policy.act_deterministic(ppo.norm.normalize(obs))
-                    obs, r, done, info = env.step(a)
-                    h = env.sensordata()[:, h_idx]
-                    h_max = torch.maximum(h_max, h)
-                    streak = torch.maximum(streak, env.tracker.consecutive)
-                    achieved |= info["first_success"]
-                    if args.speed > 0:
-                        lag = (i + 1) * dt / args.speed - (time.monotonic() - t0)
-                        if lag > 0:
-                            time.sleep(min(lag, 0.05))
-            h_fin = env.sensordata()[:, h_idx].cpu().numpy()
-            rows = []
-            for w in range(n):
-                rows.append({"world": w, "start": kinds[w],
-                             "h_max": round(float(h_max[w]), 3),
-                             "h_final": round(float(h_fin[w]), 3),
-                             "max_standing_s": round(float(streak[w]) * dt, 2),
-                             "success": bool(achieved[w])})
-            print(json.dumps({"episode_s": env.episode_steps * dt,
-                              "successes": int(achieved.sum()),
-                              "h_max_mean": round(float(h_max.mean()), 3),
-                              "h_final_mean": round(float(h_fin.mean()), 3)}),
-                  flush=True)
-            for row in rows:
-                print(json.dumps(row), flush=True)
-            if not args.loop:
-                break
+        replay_episodes(ppo, env, [q for _, q in starts], [k for k, _ in starts],
+                        streamer=streamer, speed=args.speed, loop=args.loop,
+                        status_extra={"ckpt": str(args.ckpt),
+                                      "trained_body_steps": ppo.body_steps},
+                        on_episode=on_episode)
     except KeyboardInterrupt:
         print("stopped")
     finally:

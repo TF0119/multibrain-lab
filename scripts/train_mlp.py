@@ -52,6 +52,9 @@ def parse_args():
     ap.add_argument("--max-compute-hours", type=float, default=None,
                     help="optional wall-clock cap (§10.3)")
     ap.add_argument("--collect-len", type=int, default=64)
+    ap.add_argument("--no-play-after", action="store_true",
+                    help="with --stream: exit when done instead of replaying "
+                         "the final policy for the viewer")
     return ap.parse_args()
 
 
@@ -119,6 +122,7 @@ def main():
         from multibrain.monitor import PoseStreamer, build_meta
         mjm = mujoco.MjModel.from_xml_path(str(XML_PATH))
         meta = build_meta(mjm, condition="mlp_control")
+        meta["mode"] = "train"
         streamer = PoseStreamer(meta, host=args.host,
                                 port=args.port).start()
         if not streamer.enabled:
@@ -140,7 +144,8 @@ def main():
         eval_env = WarpBodyEnv(nworld=EVAL_N, task=args.task,
                                seed=args.seed + 1000)
         starts = eval_starts(
-            BodyLayout.from_model(eval_env.mjm), n=EVAL_N, seed=EVAL_SEED)
+            BodyLayout.from_model(eval_env.mjm), n=EVAL_N, seed=EVAL_SEED,
+            mjm=eval_env.mjm)
     next_eval = args.eval_every
     t_start = time.monotonic()
 
@@ -154,6 +159,17 @@ def main():
         while ppo.body_steps < args.total_steps:
             stats = ppo.update()
             log({"type": "update", **stats})
+            if streamer is not None:
+                streamer.submit_status({
+                    "mode": "train", "body_steps": ppo.body_steps,
+                    "total_steps": int(args.total_steps),
+                    "update": ppo.updates,
+                    "elapsed_s": round(time.monotonic() - t_start, 1),
+                    "steps_per_s": round(stats["steps_per_s"]),
+                    "mean_reward": round(stats["mean_reward"], 4),
+                    "standing_frac": round(stats["standing_frac"], 4),
+                    "successes": stats["successes"],
+                    "max_consecutive": stats["max_consecutive"]})
             if (eval_env is not None
                     and ppo.body_steps >= next_eval):
                 ev = run_eval(ppo, eval_env, starts)
@@ -178,6 +194,28 @@ def main():
         ppo.save(ckpt_path)
         log({"type": "done", "body_steps": ppo.body_steps,
              "checkpoint": str(ckpt_path)})
+        if streamer is not None and not args.no_play_after:
+            # keep the viewer alive: replay the final policy on the 24
+            # evaluation starts until Ctrl+C (status mode "replay")
+            from multibrain.learning import replay_episodes
+            env.close()
+            env = WarpBodyEnv(nworld=EVAL_N, task=args.task,
+                              seed=args.seed + 2000, streamer=streamer)
+            play_starts = eval_starts(
+                BodyLayout.from_model(env.mjm), n=EVAL_N, seed=EVAL_SEED,
+                mjm=env.mjm)
+            ppo_play = PPO.load(ckpt_path, env)
+            print("[stream] training done; replaying the final policy "
+                  "(Ctrl+C to stop)", flush=True)
+            try:
+                replay_episodes(
+                    ppo_play, env, [q for _, q in play_starts],
+                    [k for k, _ in play_starts], streamer=streamer,
+                    speed=1.0, loop=True,
+                    status_extra={"ckpt": str(ckpt_path),
+                                  "trained_body_steps": ppo.body_steps})
+            except KeyboardInterrupt:
+                pass
     finally:
         env.close()
         if eval_env is not None:

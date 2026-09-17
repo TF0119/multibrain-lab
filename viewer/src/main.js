@@ -228,6 +228,7 @@ addEventListener('resize', () => {
 
 const statusEl = document.getElementById('status');
 const infoEl = document.getElementById('info');
+const trainEl = document.getElementById('train');
 const logEl = document.getElementById('log');
 const log = (msg) => {
   const line = document.createElement('div');
@@ -297,8 +298,51 @@ function onMeta(msg) {
     actEl.style.display = 'none';
   }
   log(`meta: ${meta.bodies.length} bodies, ${meta.joints.length} joints` +
-      `${meta.condition ? ` (${meta.condition})` : ''}`);
+      `${meta.condition ? ` (${meta.condition})` : ''}` +
+      `${meta.mode ? ` mode=${meta.mode}` : ''}`);
+  trainEl.textContent = meta.mode === 'train' ? '学習中（状態の受信待ち）'
+    : meta.mode === 'replay' ? '再生中（状態の受信待ち）' : '配信元の状態: 未受信';
+  trainEl.className = meta.mode === 'replay' ? 'replay' : '';
 }
+
+// ---------- 配信元の状態（学習中 / 再生中） ----------
+let lastStatus = null, lastStatusAt = 0;
+const fmtInt = (n) => Number(n).toLocaleString('en-US');
+const fmtClock = (s) => {
+  s = Math.max(0, Math.floor(s));
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  return (h ? `${h}:` : '') + `${h ? String(m).padStart(2, '0') : m}:${String(sec).padStart(2, '0')}`;
+};
+function statusText(st) {
+  if (st.mode === 'train') {
+    const pct = st.total_steps ? (100 * st.body_steps / st.total_steps).toFixed(1) : '?';
+    return `学習中 ${fmtInt(st.body_steps)} / ${fmtInt(st.total_steps)} step (${pct}%)` +
+      `  経過 ${fmtClock(st.elapsed_s)}  更新 ${st.update}  ${fmtInt(st.steps_per_s)} step/s\n` +
+      `報酬/step ${st.mean_reward}  立位率 ${(100 * (st.standing_frac ?? 0)).toFixed(2)}%` +
+      `  成功 ${st.successes ?? 0}  最長連続 ${st.max_consecutive ?? 0}`;
+  }
+  if (st.mode === 'replay') {
+    return `再生中（学習 ${fmtInt(st.trained_body_steps ?? 0)} step のチェックポイント` +
+      `${st.ckpt ? ' ' + st.ckpt : ''}）\n試行 ${st.episode ?? 0}  t=${st.episode_t ?? 0}s / ${st.episode_s ?? 60}s` +
+      `  経過 ${fmtClock(st.elapsed_s ?? 0)}`;
+  }
+  return JSON.stringify(st);
+}
+function onStatus(st) {
+  lastStatus = st;
+  lastStatusAt = performance.now();
+  trainEl.textContent = statusText(st);
+  trainEl.className = st.mode === 'replay' ? 'replay' : '';
+}
+function refreshStatusAge() {
+  if (!lastStatus) return;
+  const age = (performance.now() - lastStatusAt) / 1000;
+  if (age > 5) {
+    trainEl.textContent = statusText(lastStatus) + `\n（${age.toFixed(0)} 秒間 更新なし）`;
+    trainEl.className = 'stale';
+  }
+}
+setInterval(refreshStatusAge, 1000);
 
 let backoff = 500;
 function connect() {
@@ -312,7 +356,8 @@ function connect() {
   ws.onmessage = (ev) => {
     try {
       if (typeof ev.data === 'string') {
-        onMeta(JSON.parse(ev.data));
+        const msg = JSON.parse(ev.data);
+        if (msg.type === 'status') onStatus(msg); else onMeta(msg);
       } else {
         // 先頭 4 バイトで MBP1（姿勢）と MBA1（活動）を振り分ける。
         const dv = new DataView(ev.data);
@@ -331,6 +376,8 @@ function connect() {
   ws.onclose = () => {
     statusEl.textContent = `切断 — ${(backoff / 1000).toFixed(1)}s 後に再接続`;
     statusEl.className = 'err';
+    trainEl.textContent = '配信元なし（学習プロセスが終了したか、まだ起動していません）';
+    trainEl.className = 'stale';
     setTimeout(connect, backoff);
     backoff = Math.min(backoff * 2, 8000);
   };
