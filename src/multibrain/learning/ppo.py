@@ -15,9 +15,16 @@ shuffles the flattened (T*B) batch into cfg.n_minibatch minibatches for
 cfg.epochs epochs; clip 0.2, Adam lr 3e-4, entropy coef 0, grad-norm 1.0
 — the §7 initial values.
 
-Observations pass through a RunningNorm (updated during collection only);
-the value input is [normalized obs, last applied torque] where the torque
+Observations pass through a RunningNorm (updated during collection only).
+The buffer stores the *normalized* observation that the policy actually
+saw, so the update evaluates the ratio on exactly the input that produced
+logp_old (re-normalizing raw obs with the final statistics would shift it).
+The value input is [normalized obs, last applied torque] where the torque
 is the GPU view of env's d.act, i.e. the torque that produced the obs.
+
+The gradient-norm limit (max_grad_norm) is applied to the policy and the
+value network separately, so a large value loss cannot shrink the policy
+update through a shared norm.
 
 Per body step the rollout does at most one host sync, to decide whether
 any world needs reset; all statistic accumulators stay on the GPU and are
@@ -129,7 +136,7 @@ class PPO:
                 v2 = self.value(nobs2, self._applied_torque())
             time_out = info["time_out"]
 
-            buf["obs"][t] = obs
+            buf["obs"][t] = nobs          # normalized, as seen by the policy
             buf["act"][t] = act_prev
             buf["u"][t] = u
             buf["logp"][t] = logp
@@ -205,12 +212,12 @@ class PPO:
         ret = ret.reshape(n)
 
         pg_l = v_l = ent = clip_f = 0.0
-        params = (list(self.policy.parameters())
-                  + list(self.value.parameters()))
+        pol_params = list(self.policy.parameters())
+        val_params = list(self.value.parameters())
         for _ in range(cfg.epochs):
             for mb in torch.randperm(n, device=obs.device).chunk(
                     cfg.n_minibatch):
-                nobs = self.norm.normalize(obs[mb])
+                nobs = obs[mb]                # already normalized
                 logp = self.policy.log_prob(nobs, u[mb])
                 ratio = (logp - logp_old[mb]).exp()
                 pg = -torch.min(
@@ -224,7 +231,8 @@ class PPO:
 
                 self.optim.zero_grad(set_to_none=True)
                 loss.backward()
-                torch.nn.utils.clip_grad_norm_(params, cfg.max_grad_norm)
+                torch.nn.utils.clip_grad_norm_(pol_params, cfg.max_grad_norm)
+                torch.nn.utils.clip_grad_norm_(val_params, cfg.max_grad_norm)
                 self.optim.step()
 
                 pg_l += float(pg.detach()) / (cfg.epochs * cfg.n_minibatch)
@@ -245,6 +253,13 @@ class PPO:
         self.updates += 1
         stats["body_steps"] = self.body_steps
         stats["update"] = self.updates
+        if self.env.device.type == "cuda":
+            stats["gpu_mem_alloc_mb"] = (
+                torch.cuda.max_memory_allocated(self.env.device) / 2 ** 20)
+            stats["gpu_mem_reserved_mb"] = (
+                torch.cuda.max_memory_reserved(self.env.device) / 2 ** 20)
+        else:
+            stats["gpu_mem_alloc_mb"] = stats["gpu_mem_reserved_mb"] = 0.0
         return stats
 
     # -------------------------------------------------------- checkpoint

@@ -43,7 +43,8 @@ def test_one_update(env):
     assert ppo.updates == 1
     for key in ("loss", "pg_loss", "v_loss", "entropy", "clip_frac",
                 "mean_reward", "steps_per_s", "success_rate",
-                "max_consecutive"):
+                "max_consecutive", "gpu_mem_alloc_mb",
+                "gpu_mem_reserved_mb"):
         assert key in stats
         assert math.isfinite(stats[key]), key
     assert len(stats["terms"]) == 9
@@ -73,3 +74,19 @@ def test_save_load_roundtrip(env, tmp_path):
                                    ppo2.policy.act_deterministic(nobs2))
         torch.testing.assert_close(ppo.value(nobs1, act),
                                    ppo2.value(nobs1, act))
+
+
+def test_buffer_logp_matches_stored_obs(env):
+    """The buffer keeps the normalized obs the policy sampled from, so
+    re-evaluating log_prob on it reproduces logp_old exactly (ratio = 1
+    before any optimizer step)."""
+    ppo = PPO(env, cfg=PPOConfig(collect_len=COLLECT_LEN))
+    buf, _ = ppo.collect()
+    T, B = COLLECT_LEN, NWORLD
+    with torch.no_grad():
+        logp = ppo.policy.log_prob(buf["obs"].reshape(T * B, -1),
+                                   buf["u"].reshape(T * B, -1))
+    torch.testing.assert_close(logp, buf["logp"].reshape(T * B),
+                               rtol=0, atol=1e-5)
+    # stored obs are the normalized ones: within the clip range
+    assert buf["obs"].abs().max() <= ppo.norm.clip
