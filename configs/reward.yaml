@@ -17,9 +17,11 @@ coef:
 
 uprightness:
   min_height_ratio: 0.0       # 追加のゲート（0 = なし）
-  height_weight: true         # cos θ に clamp(h/h_ref, 0, 1) を掛ける（§5.3）。
-                              # 掛けないと「寝たまま腰を曲げて上体だけ起こす」で
-                              # 得点でき、骨盤が上がらない局所解に入る
+  height_ramp: [0.35, 0.70]   # cos θ に掛ける高さの傾斜（h/h_ref）。
+                              # 0.35 h_ref (0.29 m) 未満は 0、0.70 h_ref (0.59 m)
+                              # 以上で 1。臥位（0.23）で胴だけ起こしても 0 なので
+                              # 「寝たまま腰を曲げる」局所解に報酬が付かず、
+                              # 立ち上がる領域だけ滑らかに効く（§5.3）
 
 extra_contact:
   min_height_ratio: 0.8

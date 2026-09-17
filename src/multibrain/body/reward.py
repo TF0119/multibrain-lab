@@ -5,7 +5,7 @@ RewardConfig); nothing is hard-coded. The ten terms are:
 
   height_progress      c * (h_t - h_{t-1}) / h_ref
   height               c * h_t / h_ref            (dense; gradient at every height)
-  uprightness          c * clamp(cos tilt, -1, 1) * clamp(h_t / h_ref, 0, 1)
+  uprightness          c * clamp(cos tilt, -1, 1) * ramp(h_t / h_ref)
   standing             c * 1[standing]
   first_success        c * 1[first_success]
   pain_impact          -c * sum_k w_k onset_k min([vz_k - v0]+^2, v_cap^2)
@@ -39,7 +39,7 @@ class RewardConfig:
     h_ref: float
     coef: dict                    # term name -> coefficient (9 entries)
     uprightness_min_height_ratio: float
-    uprightness_height_weight: bool
+    uprightness_height_ramp: tuple      # (lo, hi) in units of h_ref
     extra_contact_min_height_ratio: float
     contact_force_min: float      # N
     impact_sites: list            # site names, order of the impact state
@@ -58,8 +58,9 @@ class RewardConfig:
             coef={k: float(v) for k, v in y["coef"].items()},
             uprightness_min_height_ratio=
                 float(y["uprightness"]["min_height_ratio"]),
-            uprightness_height_weight=
-                bool(y["uprightness"].get("height_weight", False)),
+            uprightness_height_ramp=tuple(
+                float(v) for v in y["uprightness"].get(
+                    "height_ramp", (0.0, 0.0))),
             extra_contact_min_height_ratio=
                 float(y["extra_contact"]["min_height_ratio"]),
             contact_force_min=float(y["contact"]["force_min_n"]),
@@ -144,11 +145,16 @@ class Reward:
             cfg.coef["height_progress"] * (h_t - self.h_prev) / cfg.h_ref)
         terms["height"] = cfg.coef["height"] * h_t / cfg.h_ref
         up = tilt * (h_t >= cfg.uprightness_min_height_ratio * cfg.h_ref).to(dt)
-        if cfg.uprightness_height_weight:
-            # weight by height: raising the torso while still lying flat must
-            # not pay (measured: without this the policy crunches its trunk
-            # upright at 0.17 m and the pelvis never rises)
-            up = up * torch.clamp(h_t / cfg.h_ref, 0.0, 1.0)
+        lo, hi = cfg.uprightness_height_ramp
+        if hi > lo:
+            # Ramp in height: raising the torso while still lying flat must not
+            # pay at all. Measured: with no height factor the policy crunches
+            # its trunk upright at 0.17 m; with a linear h/h_ref factor it does
+            # the same at 0.20 m. Only a ramp that is exactly zero below the
+            # lying range removes that shortcut, and a ramp rather than a step
+            # avoids cutting the gradient off at a threshold (the 0.5 h_ref
+            # gate stalled a run at 0.39 m for 1e8 body steps).
+            up = up * torch.clamp((h_t / cfg.h_ref - lo) / (hi - lo), 0.0, 1.0)
         terms["uprightness"] = cfg.coef["uprightness"] * up
         terms["standing"] = cfg.coef["standing"] * standing.to(dt)
         terms["first_success"] = (cfg.coef["first_success"]

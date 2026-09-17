@@ -196,7 +196,8 @@ def test_propped_pelvis_pays_less_than_standing(layout, rcfg):
     zeros = torch.zeros(1, layout.nu)
     f = torch.zeros(1, dtype=torch.bool)
     total, terms = reward.step(s, zeros, zeros, f, f)
-    w = 0.85 if rcfg.uprightness_height_weight else 1.0
+    lo, hi = rcfg.uprightness_height_ramp
+    w = min(max((0.85 - lo) / (hi - lo), 0.0), 1.0) if hi > lo else 1.0
     expected = (rcfg.coef["uprightness"] * 0.7 * w
                 + rcfg.coef["height"] * 0.85
                 - rcfg.coef["extra_contact"] * 2)

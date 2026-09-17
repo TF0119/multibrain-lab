@@ -96,6 +96,7 @@ def run_eval(ppo, eval_env, starts):
             achieved |= fs
     ppo.norm.unfreeze()
 
+    h_fin = env.sensordata()[:, h_idx]
     ok = achieved.cpu().numpy()
     t_first = first_step.cpu().numpy()
     per_kind = {}
@@ -110,6 +111,11 @@ def run_eval(ppo, eval_env, starts):
         "first_success_body_steps": [int(t) for t in t_first if t >= 0],
         "h_max_mean": round(float(h_max.mean()), 4),
         "h_max_best": round(float(h_max.max()), 4),
+        # h_max is dominated by the passive transient right after the reset
+        # (measured: identical to 4 decimals across four evals 5M steps
+        # apart), so the final height is what actually tracks progress
+        "h_final_mean": round(float(h_fin.mean()), 4),
+        "h_final_best": round(float(h_fin.max()), 4),
         "max_standing_s": round(float(streak.max()) * env.body_step_s, 2),
     }
 
@@ -163,7 +169,8 @@ def main():
     log_path = out / "log.jsonl"
     ckpt_path = out / "ckpt.pt"
     best_path = out / "ckpt_best.pt"
-    # best = most eval successes, ties broken by the mean peak pelvis height
+    # best = most eval successes, ties broken by the mean FINAL pelvis height
+    # (the peak is the reset transient, see run_eval)
     best_score = (-1, -1.0)
 
     eval_env = None
@@ -201,7 +208,7 @@ def main():
             if (eval_env is not None
                     and ppo.body_steps >= next_eval):
                 ev = run_eval(ppo, eval_env, starts)
-                score = (ev["successes"], ev["h_max_mean"])
+                score = (ev["successes"], ev["h_final_mean"])
                 is_best = score > best_score
                 if is_best:
                     best_score = score
