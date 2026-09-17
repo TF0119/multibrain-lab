@@ -186,7 +186,7 @@ def test_propped_pelvis_pays_less_than_standing(layout, rcfg):
     """Synthetic: pelvis at 0.85 h_ref propped on both hands (torso z axis
     tilted to cos 0.7), feet loaded too. Per step: uprightness 0.2 * 0.7
     plus dense height 0.05 * 0.85 minus extra contact 0.05 * 2 hands
-    = 0.0825, versus ~1.25 for standing."""
+    = 0.0825 (uprightness is height-weighted), versus ~1.25 for standing."""
     s = _synthetic(layout, framepos_imu=[0.0, 0.0, 0.85 * rcfg.h_ref],
                    framezaxis_torso=[0.0, math.sqrt(1 - 0.7 ** 2), 0.7],
                    touch_hand_L=30.0, touch_hand_R=30.0,
@@ -196,7 +196,8 @@ def test_propped_pelvis_pays_less_than_standing(layout, rcfg):
     zeros = torch.zeros(1, layout.nu)
     f = torch.zeros(1, dtype=torch.bool)
     total, terms = reward.step(s, zeros, zeros, f, f)
-    expected = (rcfg.coef["uprightness"] * 0.7
+    w = 0.85 if rcfg.uprightness_height_weight else 1.0
+    expected = (rcfg.coef["uprightness"] * 0.7 * w
                 + rcfg.coef["height"] * 0.85
                 - rcfg.coef["extra_contact"] * 2)
     assert float(total) == pytest.approx(expected, abs=1e-6)

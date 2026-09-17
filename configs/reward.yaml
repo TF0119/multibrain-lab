@@ -16,8 +16,10 @@ coef:
   extra_contact: 0.05         # -(足以外の接触数) · 1[h_t ≥ extra_contact.min_height_ratio · h_ref]
 
 uprightness:
-  min_height_ratio: 0.0       # ゲートなし（§5.3）。臥位は cos ≈ 0 なので 0、
-                              # 胴を起こすほど 0 → 0.2 へ連続に増える
+  min_height_ratio: 0.0       # 追加のゲート（0 = なし）
+  height_weight: true         # cos θ に clamp(h/h_ref, 0, 1) を掛ける（§5.3）。
+                              # 掛けないと「寝たまま腰を曲げて上体だけ起こす」で
+                              # 得点でき、骨盤が上がらない局所解に入る
 
 extra_contact:
   min_height_ratio: 0.8

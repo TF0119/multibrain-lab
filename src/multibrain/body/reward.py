@@ -5,7 +5,7 @@ RewardConfig); nothing is hard-coded. The ten terms are:
 
   height_progress      c * (h_t - h_{t-1}) / h_ref
   height               c * h_t / h_ref            (dense; gradient at every height)
-  uprightness          c * clamp(cos tilt, -1, 1) * 1[h_t >= 0.5 h_ref]
+  uprightness          c * clamp(cos tilt, -1, 1) * clamp(h_t / h_ref, 0, 1)
   standing             c * 1[standing]
   first_success        c * 1[first_success]
   pain_impact          -c * sum_k w_k onset_k min([vz_k - v0]+^2, v_cap^2)
@@ -39,6 +39,7 @@ class RewardConfig:
     h_ref: float
     coef: dict                    # term name -> coefficient (9 entries)
     uprightness_min_height_ratio: float
+    uprightness_height_weight: bool
     extra_contact_min_height_ratio: float
     contact_force_min: float      # N
     impact_sites: list            # site names, order of the impact state
@@ -57,6 +58,8 @@ class RewardConfig:
             coef={k: float(v) for k, v in y["coef"].items()},
             uprightness_min_height_ratio=
                 float(y["uprightness"]["min_height_ratio"]),
+            uprightness_height_weight=
+                bool(y["uprightness"].get("height_weight", False)),
             extra_contact_min_height_ratio=
                 float(y["extra_contact"]["min_height_ratio"]),
             contact_force_min=float(y["contact"]["force_min_n"]),
@@ -140,10 +143,13 @@ class Reward:
         terms["height_progress"] = (
             cfg.coef["height_progress"] * (h_t - self.h_prev) / cfg.h_ref)
         terms["height"] = cfg.coef["height"] * h_t / cfg.h_ref
-        terms["uprightness"] = (
-            cfg.coef["uprightness"] * tilt
-            * (h_t >= cfg.uprightness_min_height_ratio
-               * cfg.h_ref).to(dt))
+        up = tilt * (h_t >= cfg.uprightness_min_height_ratio * cfg.h_ref).to(dt)
+        if cfg.uprightness_height_weight:
+            # weight by height: raising the torso while still lying flat must
+            # not pay (measured: without this the policy crunches its trunk
+            # upright at 0.17 m and the pelvis never rises)
+            up = up * torch.clamp(h_t / cfg.h_ref, 0.0, 1.0)
+        terms["uprightness"] = cfg.coef["uprightness"] * up
         terms["standing"] = cfg.coef["standing"] * standing.to(dt)
         terms["first_success"] = (cfg.coef["first_success"]
                                   * first_success.to(dt))
