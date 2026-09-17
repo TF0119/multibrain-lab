@@ -158,8 +158,8 @@ def test_hopping_pays_less_than_standing(mjm, layout, rcfg, scfg):
 def test_kneeling_pays_less_than_standing(mjm, layout, rcfg, scfg):
     """Kneeling (hip 18 deg, knee 95 deg, pelvis 0.46 m, settled 1.5 s; the
     pose of tests/test_success.py) held for 2 s: never standing, and the
-    per-step reward stays at or below the 0.2 uprightness ceiling, far below
-    quiet standing's ~1.2 per step."""
+    per-step reward stays below the uprightness ceiling plus the dense height
+    term at that height, far below quiet standing's ~1.35 per step."""
     d = mujoco.MjData(mjm)
     d.qpos[2] = 0.46
     for n, deg in (("hip_L_x", 18.0), ("hip_R_x", 18.0),
@@ -173,7 +173,10 @@ def test_kneeling_pays_less_than_standing(mjm, layout, rcfg, scfg):
                      lambda i: np.zeros(mjm.nu))
     assert not any(st for _, _, st in kneel)
     per_step = sum(tot for tot, _, _ in kneel) / len(kneel)
-    assert per_step <= 0.25
+    # bound from the coefficients: uprightness (at most its full value) plus
+    # the dense height term at the kneeling height, and nothing else
+    bound = rcfg.coef["uprightness"] + rcfg.coef["height"] * 0.55
+    assert per_step <= bound
 
     still = _rollout(mjm, _standing_data(mjm), layout, rcfg, scfg,
                      STILL_STEPS, lambda i: np.zeros(mjm.nu))
