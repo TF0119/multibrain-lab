@@ -6,7 +6,7 @@ h_ref: 0.84
 coef:
   height_progress: 2.0        # (h_t - h_{t-1}) / h_ref
   height: 0.05                # h_t / h_ref（密な高さ。中間の高さにも勾配を与える）
-  uprightness: 0.2            # cos θ_t · 1[h_t ≥ uprightness.min_height_ratio · h_ref]
+  uprightness: 0.2            # cos θ_t（ゲートは uprightness.min_height_ratio）
   standing: 1.0               # 成功条件（§5.2）を満たすステップごとに 1
   first_success: 10.0         # 連続 10 秒を初めて満たしたとき一回
   pain_impact: 0.5            # -Σ_k w_k · onset_k · min([v_k - v0]+², v_cap²)
@@ -16,7 +16,8 @@ coef:
   extra_contact: 0.05         # -(足以外の接触数) · 1[h_t ≥ extra_contact.min_height_ratio · h_ref]
 
 uprightness:
-  min_height_ratio: 0.5
+  min_height_ratio: 0.0       # ゲートなし（§5.3）。臥位は cos ≈ 0 なので 0、
+                              # 胴を起こすほど 0 → 0.2 へ連続に増える
 
 extra_contact:
   min_height_ratio: 0.8

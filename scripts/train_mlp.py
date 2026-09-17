@@ -79,10 +79,16 @@ def run_eval(ppo, eval_env, starts):
     obs = env.reset_to(qpos)
     achieved = torch.zeros(n, dtype=torch.bool, device=env.device)
     first_step = torch.full((n,), -1, dtype=torch.long, device=env.device)
+    from multibrain.body.layout import BodyLayout as _BL
+    h_idx = _BL.from_model(env.mjm).framepos_idx[2]
+    h_max = torch.zeros(n, device=env.device)
+    streak = torch.zeros(n, dtype=torch.long, device=env.device)
     with torch.no_grad():
         for i in range(env.episode_steps):
             a = ppo.policy.act_deterministic(ppo.norm.normalize(obs))
             obs, _, _, info = env.step(a)
+            h_max = torch.maximum(h_max, env.sensordata()[:, h_idx])
+            streak = torch.maximum(streak, env.tracker.consecutive)
             fs = info["first_success"]
             first_step = torch.where(fs & (first_step < 0),
                                      torch.full_like(first_step, i),
@@ -102,6 +108,9 @@ def run_eval(ppo, eval_env, starts):
         "successes": int(ok.sum()),
         "per_kind": per_kind,
         "first_success_body_steps": [int(t) for t in t_first if t >= 0],
+        "h_max_mean": round(float(h_max.mean()), 4),
+        "h_max_best": round(float(h_max.max()), 4),
+        "max_standing_s": round(float(streak.max()) * env.body_step_s, 2),
     }
 
 
@@ -153,6 +162,9 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     log_path = out / "log.jsonl"
     ckpt_path = out / "ckpt.pt"
+    best_path = out / "ckpt_best.pt"
+    # best = most eval successes, ties broken by the mean peak pelvis height
+    best_score = (-1, -1.0)
 
     eval_env = None
     starts = None
@@ -189,7 +201,13 @@ def main():
             if (eval_env is not None
                     and ppo.body_steps >= next_eval):
                 ev = run_eval(ppo, eval_env, starts)
-                log({"type": "eval", "body_steps": ppo.body_steps, **ev})
+                score = (ev["successes"], ev["h_max_mean"])
+                is_best = score > best_score
+                if is_best:
+                    best_score = score
+                    ppo.save(best_path)
+                log({"type": "eval", "body_steps": ppo.body_steps,
+                     "best": is_best, **ev})
                 next_eval += args.eval_every
             if (args.max_compute_hours is not None
                     and time.monotonic() - t_start
