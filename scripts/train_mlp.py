@@ -178,9 +178,11 @@ def main():
     if args.eval_every and args.eval_every > 0:
         eval_env = WarpBodyEnv(nworld=EVAL_N, task=args.task,
                                seed=args.seed + 1000, **env_kw)
+        # evaluate from the task's own start poses (§5.2): a balance task
+        # must be judged from standing, not from the floor
         starts = eval_starts(
             BodyLayout.from_model(eval_env.mjm), n=EVAL_N, seed=EVAL_SEED,
-            mjm=eval_env.mjm)
+            mjm=eval_env.mjm, kinds=eval_env._starts)
     next_eval = args.eval_every
     t_start = time.monotonic()
 
@@ -244,7 +246,7 @@ def main():
                               seed=args.seed + 2000, streamer=streamer)
             play_starts = eval_starts(
                 BodyLayout.from_model(env.mjm), n=EVAL_N, seed=EVAL_SEED,
-                mjm=env.mjm)
+                mjm=env.mjm, kinds=env._starts)
             ppo_play = PPO.load(ckpt_path, env)
             print("[stream] training done; replaying the final policy "
                   "(Ctrl+C to stop)", flush=True)

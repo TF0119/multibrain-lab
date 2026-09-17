@@ -68,7 +68,7 @@ def main():
         starts = [(kinds_all[i % 3], start_qpos(layout, kinds_all[i % 3], rng, env.mjm))
                   for i in range(env.nworld)]
     else:
-        starts = eval_starts(layout, n=24, mjm=env.mjm)
+        starts = eval_starts(layout, n=24, mjm=env.mjm, kinds=env._starts)
         starts = starts[args.world:] + starts[:args.world]
     dt = env.body_step_s
 

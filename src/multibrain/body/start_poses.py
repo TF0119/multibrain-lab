@@ -154,16 +154,21 @@ def start_qpos(layout, kind: str, rng: np.random.Generator,
     return qpos.astype(np.float32)
 
 
-def eval_starts(layout, n: int = 24, seed: int = 12345, mjm=None):
-    """Fixed evaluation starts: supine / prone / side, n/3 of each.
+def eval_starts(layout, n: int = 24, seed: int = 12345, mjm=None,
+                kinds=EVAL_KINDS):
+    """Fixed evaluation starts: n/len(kinds) of each kind.
 
     Fixed seed — these are the §5.2 evaluation conditions and must not
-    overlap the training stream. Not used during learning.
+    overlap the training stream. Not used during learning. `kinds`
+    defaults to the rise_and_stand starts; a balance task must pass its
+    own (evaluating a balance policy from the floor measures the wrong
+    thing).
     """
     rng = np.random.default_rng(seed)
-    per = n // len(EVAL_KINDS)
+    kinds = list(kinds)
+    per = max(1, n // len(kinds))
     out = []
-    for kind in EVAL_KINDS:
+    for kind in kinds:
         for _ in range(per):
             out.append((kind, start_qpos(layout, kind, rng, mjm)))
-    return out
+    return out[:n]
